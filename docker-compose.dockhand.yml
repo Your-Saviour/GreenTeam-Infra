@@ -164,6 +164,8 @@ services:
       AUTH_LOGOUT_REDIRECT_URL: https://auth.blueteam.au/application/o/${HOMARR_OIDC_SLUG:-homarr}/end-session/
       # AUTH_OIDC_AUTO_LOGIN: "true"
       TZ: ${TZ:-Australia/Adelaide}
+      # Allow internal OIDC discovery through Traefik without cert verification
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.homarr.rule=Host(`home.blueteam.au`)"
