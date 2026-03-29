@@ -5,8 +5,9 @@
 # All services use the shared 'proxy' network for Traefik discovery.
 #
 # Current services:
-#   authentik v2026.2.1  - https://docs.goauthentik.io   (auth.blueteam.au)
-#   Homarr    (latest)   - https://homarr.dev             (home.blueteam.au)
+#   authentik    v2026.2.1  - https://docs.goauthentik.io   (auth.blueteam.au)
+#   Homarr       (latest)   - https://homarr.dev             (home.blueteam.au)
+#   Vaultwarden  (latest)   - https://github.com/dani-garcia/vaultwarden  (vault.gt.blueteam.au)
 #
 # FIRST TIME SETUP:
 #   1. Copy .env.example.dockhand to .env and fill in your values
@@ -177,6 +178,38 @@ services:
     networks:
       - proxy
 
+  # ---------------------------------------------------------------------------
+  # Vaultwarden - Lightweight Bitwarden-compatible password manager
+  #
+  # OIDC SETUP (after authentik is running):
+  #   1. In authentik admin UI, create a new OAuth2/OIDC application for Vaultwarden
+  #   2. Set redirect URI to: https://vault.gt.blueteam.au/identity/connect/oidc-signin
+  #   3. Note the Client ID, Client Secret, and application slug
+  #   4. Add to .env: VAULTWARDEN_OIDC_CLIENT_ID, VAULTWARDEN_OIDC_CLIENT_SECRET, VAULTWARDEN_OIDC_SLUG
+  #   5. Restart Vaultwarden: docker compose -f docker-compose.dockhand.yml restart vaultwarden
+  # ---------------------------------------------------------------------------
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    volumes:
+      - vaultwarden_data:/data
+    environment:
+      DOMAIN: https://vault.gt.blueteam.au
+      SSO_ENABLED: "true"
+      SSO_CLIENT_ID: ${VAULTWARDEN_OIDC_CLIENT_ID:-}
+      SSO_CLIENT_SECRET: ${VAULTWARDEN_OIDC_CLIENT_SECRET:-}
+      SSO_AUTHORITY: https://auth.blueteam.au/application/o/${VAULTWARDEN_OIDC_SLUG:-vaultwarden}/
+      TZ: ${TZ:-Australia/Adelaide}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vaultwarden.rule=Host(`vault.gt.blueteam.au`)"
+      - "traefik.http.routers.vaultwarden.entrypoints=websecure"
+      - "traefik.http.routers.vaultwarden.tls.certresolver=letsencrypt"
+      - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
+    networks:
+      - proxy
+
 # =============================================================================
 # Volumes
 # =============================================================================
@@ -184,6 +217,8 @@ volumes:
   postgresql_data:
     driver: local
   homarr_data:
+    driver: local
+  vaultwarden_data:
     driver: local
 
 # =============================================================================
