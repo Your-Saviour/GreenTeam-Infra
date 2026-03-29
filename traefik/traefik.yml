@@ -23,4 +23,3 @@ providers:
   docker:
     exposedByDefault: false
     network: proxy
-    apiVersion: "1.40"
