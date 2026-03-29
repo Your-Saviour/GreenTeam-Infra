@@ -17,7 +17,7 @@ services:
       - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
-      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$2y$05$gxakRHt5HcGQM3I3mJJvEuq9r4as6J4TQEp1gldCpzoNkF689b4iu"
+      - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$2y$$05$$gxakRHt5HcGQM3I3mJJvEuq9r4as6J4TQEp1gldCpzoNkF689b4iu"
     networks:
       - proxy
 
