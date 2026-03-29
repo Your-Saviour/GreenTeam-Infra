@@ -146,6 +146,8 @@ services:
     image: ghcr.io/homarr-labs/homarr:latest
     container_name: homarr
     restart: unless-stopped
+    extra_hosts:
+      - "auth.blueteam.au:host-gateway"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./homarr/appdata:/appdata

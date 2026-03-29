@@ -1,1 +1,106 @@
 # GreenTeam-Infra
+
+Docker infrastructure for the GreenTeam project. All services sit behind a Traefik reverse proxy with automatic HTTPS via Let's Encrypt.
+
+## Services
+
+| Service | Domain | Stack |
+|---------|--------|-------|
+| Traefik Dashboard | `traefik.gt.blueteam.au` | Core |
+| Dockhand | `dockhand.gt.blueteam.au` | Core |
+| authentik (SSO) | `auth.blueteam.au` | Dockhand |
+| Homarr (Dashboard) | `home.blueteam.au` | Dockhand |
+
+## Quick Start
+
+### 1. Core Stack (Traefik + Dockhand)
+
+```bash
+docker compose up -d
+```
+
+This creates the `proxy` network and starts the reverse proxy and Dockhand container manager.
+
+### 2. Dockhand Services Stack (authentik + Homarr)
+
+```bash
+# Create your .env from the template
+cp .env.example.dockhand .env
+
+# Generate required secrets
+echo "PG_PASS=$(openssl rand -base64 36 | tr -d '\n')" >> .env
+echo "AUTHENTIK_SECRET_KEY=$(openssl rand -base64 60 | tr -d '\n')" >> .env
+echo "HOMARR_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+
+# Start the stack
+docker compose -f docker-compose.dockhand.yml up -d
+```
+
+### 3. First-Time Setup
+
+1. Complete authentik initial setup at `https://auth.blueteam.au/if/flow/initial-setup/`
+2. In authentik, create an OAuth2/OIDC application for Homarr:
+   - Set redirect URI to `https://home.blueteam.au/api/auth/callback/oidc`
+   - Note the Client ID, Client Secret, and application slug
+3. Add the OIDC credentials to your `.env`:
+   ```
+   HOMARR_OIDC_CLIENT_ID=<client-id>
+   HOMARR_OIDC_CLIENT_SECRET=<client-secret>
+   HOMARR_OIDC_SLUG=homarr
+   ```
+4. Restart Homarr: `docker compose -f docker-compose.dockhand.yml restart homarr`
+
+## Architecture
+
+```
+Internet (80/443)
+       |
+    Traefik ──── proxy network ────┬── Dockhand
+       |                           ├── authentik server
+       |                           └── Homarr
+       |
+  HTTP → HTTPS redirect
+  Let's Encrypt TLS (auto)
+
+authentik-internal network (isolated)
+  ├── authentik server
+  ├── authentik worker
+  └── PostgreSQL
+```
+
+- **`proxy`** — Shared network for Traefik service discovery. All web-facing containers join this.
+- **`authentik-internal`** — Isolated network for database traffic. Not reachable from outside.
+
+Traefik discovers services via Docker labels. No service publishes host ports — all ingress flows through Traefik on 80/443.
+
+## Adding a New Service
+
+Add it to `docker-compose.dockhand.yml` on the `proxy` network with Traefik labels:
+
+```yaml
+my-service:
+  image: example/service:latest
+  container_name: my-service
+  restart: unless-stopped
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.routers.my-service.rule=Host(`my-service.blueteam.au`)"
+    - "traefik.http.routers.my-service.entrypoints=websecure"
+    - "traefik.http.routers.my-service.tls.certresolver=letsencrypt"
+    - "traefik.http.services.my-service.loadbalancer.server.port=8080"
+  networks:
+    - proxy
+```
+
+## File Structure
+
+```
+docker-compose.yml              # Core: Traefik + Dockhand
+docker-compose.dockhand.yml     # Services: authentik, Homarr, future additions
+traefik/traefik.yml             # Traefik static configuration
+.env.example.dockhand           # Environment variable template
+```
+
+## Upgrading authentik
+
+Do **not** skip major versions. Always upgrade outposts at the same time as the server. See the [authentik upgrade docs](https://docs.goauthentik.io/install-config/upgrade/).
