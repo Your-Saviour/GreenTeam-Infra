@@ -197,6 +197,7 @@ services:
     environment:
       DOMAIN: https://vault.gt.blueteam.au
       SIGNUPS_ALLOWED: "false"
+      INVITATIONS_ALLOWED: "false"
       SSO_ENABLED: "true"
       SSO_CLIENT_ID: ${VAULTWARDEN_OIDC_CLIENT_ID:-}
       SSO_CLIENT_SECRET: ${VAULTWARDEN_OIDC_CLIENT_SECRET:-}
