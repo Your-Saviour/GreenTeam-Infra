@@ -19,6 +19,7 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 | **authentik-worker** | `ghcr.io/goauthentik/server:2026.2.1` | — | Background worker for authentik. Handles emails, LDAP sync, and outpost management. Not exposed to the web. |
 | **authentik-postgresql** | `postgres:16-alpine` | — | PostgreSQL database for all authentik data, caching, and task queuing. Only accessible on the isolated internal network. |
 | **homarr** | `ghcr.io/homarr-labs/homarr:latest` | `home.blueteam.au` | Homepage dashboard with per-user boards. Authenticates via OIDC through authentik. Groups synced from authentik control which board each user sees. |
+| **vaultwarden** | `vaultwarden/server:latest` | `vault.gt.blueteam.au` | Lightweight Bitwarden-compatible password manager. Authenticates via OIDC through authentik. Signups and invitations are disabled — accounts must exist before SSO login. |
 
 ## Quick Start
 
@@ -30,7 +31,7 @@ docker compose up -d
 
 This creates the `proxy` network and starts the reverse proxy and Dockhand container manager.
 
-### 2. Dockhand Services Stack (authentik + Homarr)
+### 2. Dockhand Services Stack (authentik + Homarr + Vaultwarden)
 
 ```bash
 # Create your .env from the template
@@ -66,7 +67,8 @@ Internet (80/443)
        |
     Traefik ──── proxy network ────┬── Dockhand
        |                           ├── authentik server
-       |                           └── Homarr
+       |                           ├── Homarr
+       |                           └── Vaultwarden
        |
   HTTP → HTTPS redirect
   Let's Encrypt TLS (auto)
@@ -105,7 +107,7 @@ my-service:
 
 ```
 docker-compose.yml              # Core: Traefik + Dockhand
-docker-compose.dockhand.yml     # Services: authentik, Homarr, future additions
+docker-compose.dockhand.yml     # Services: authentik, Homarr, Vaultwarden
 traefik/traefik.yml             # Traefik static configuration
 .env.example.dockhand           # Environment variable template
 ```
