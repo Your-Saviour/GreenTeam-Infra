@@ -1,0 +1,197 @@
+# =============================================================================
+# Dockhand Services Stack (Traefik-routed)
+# =============================================================================
+# Services managed via Dockhand, routed through the main Traefik instance.
+# All services use the shared 'proxy' network for Traefik discovery.
+#
+# Current services:
+#   authentik v2026.2.1  - https://docs.goauthentik.io   (auth.blueteam.au)
+#   Homarr    (latest)   - https://homarr.dev             (home.blueteam.au)
+#
+# FIRST TIME SETUP:
+#   1. Copy .env.example.dockhand to .env and fill in your values
+#   2. Generate secrets:
+#        echo "PG_PASS=$(openssl rand -base64 36 | tr -d '\n')" >> .env
+#        echo "AUTHENTIK_SECRET_KEY=$(openssl rand -base64 60 | tr -d '\n')" >> .env
+#        echo "HOMARR_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+#   3. Run: docker compose -f docker-compose.dockhand.yml up -d
+#   4. Complete authentik setup at: https://auth.blueteam.au/if/flow/initial-setup/
+#   5. Homarr is available at: https://home.blueteam.au
+#   6. After authentik is configured, fill in HOMARR_OIDC_* vars and restart
+#
+# UPGRADING authentik:
+#   Do NOT skip major versions. Always upgrade outposts at the same time.
+#   Docs: https://docs.goauthentik.io/install-config/upgrade/
+#
+# IMPORTANT:
+#   Do NOT mount /etc/timezone or /etc/localtime in authentik containers.
+#   It will break OAuth/SAML. All internal operations use UTC.
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - Primary database for all authentik data, caching, and tasks
+  # ---------------------------------------------------------------------------
+  postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: authentik-postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASS:?Please set PG_PASS in your .env file}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_DB: ${PG_DB:-authentik}
+    networks:
+      - authentik-internal
+
+  # ---------------------------------------------------------------------------
+  # authentik Server - Handles SSO flows, OIDC/SAML/LDAP providers, and the UI
+  # ---------------------------------------------------------------------------
+  server:
+    image: ghcr.io/goauthentik/server:2026.2.1
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: ""
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?Please set AUTHENTIK_SECRET_KEY in your .env file}
+      # -- Optional: Email configuration --
+      # AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
+      # AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
+      # AUTHENTIK_EMAIL__USERNAME: ${EMAIL_USERNAME:-""}
+      # AUTHENTIK_EMAIL__PASSWORD: ${EMAIL_PASSWORD:-""}
+      # AUTHENTIK_EMAIL__USE_TLS: ${EMAIL_USE_TLS:-false}
+      # AUTHENTIK_EMAIL__USE_SSL: ${EMAIL_USE_SSL:-false}
+      # AUTHENTIK_EMAIL__TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      # AUTHENTIK_EMAIL__FROM: ${EMAIL_FROM:-authentik@localhost}
+    volumes:
+      - ./media:/media
+      - ./custom-templates:/templates
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.authentik.rule=Host(`auth.blueteam.au`)"
+      - "traefik.http.routers.authentik.entrypoints=websecure"
+      - "traefik.http.routers.authentik.tls.certresolver=letsencrypt"
+      - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    networks:
+      - authentik-internal
+      - proxy
+
+  # ---------------------------------------------------------------------------
+  # authentik Worker - Background tasks (emails, LDAP sync, outpost management)
+  # ---------------------------------------------------------------------------
+  worker:
+    image: ghcr.io/goauthentik/server:2026.2.1
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: ""
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      # -- Match any email settings configured on the server above --
+      # AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
+      # AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
+      # AUTHENTIK_EMAIL__USERNAME: ${EMAIL_USERNAME:-""}
+      # AUTHENTIK_EMAIL__PASSWORD: ${EMAIL_PASSWORD:-""}
+      # AUTHENTIK_EMAIL__USE_TLS: ${EMAIL_USE_TLS:-false}
+      # AUTHENTIK_EMAIL__USE_SSL: ${EMAIL_USE_SSL:-false}
+      # AUTHENTIK_EMAIL__FROM: ${EMAIL_FROM:-authentik@localhost}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./media:/media
+      - ./custom-templates:/templates
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    networks:
+      - authentik-internal
+
+  # ---------------------------------------------------------------------------
+  # Homarr - Homepage dashboard with per-user boards and native OIDC SSO
+  #
+  # OIDC SETUP (after authentik is running):
+  #   1. In authentik admin UI, create a new OAuth2/OIDC application for Homarr
+  #   2. Set redirect URI to: https://home.blueteam.au/api/auth/callback/oidc
+  #   3. Note the Client ID, Client Secret, and application slug
+  #   4. Add to .env: HOMARR_OIDC_CLIENT_ID, HOMARR_OIDC_CLIENT_SECRET, HOMARR_OIDC_SLUG
+  #   5. Restart Homarr: docker compose -f docker-compose.authentik.yml restart homarr
+  #
+  # GROUP-BASED BOARDS:
+  #   Groups must have identical names in both authentik and Homarr.
+  #   e.g. create "homarr-admins" in authentik AND in Homarr > Management > Groups
+  #   On login, Homarr reads group claims and assigns users automatically.
+  #   Each group can have its own default board, so different users see
+  #   different apps when they log in.
+  # ---------------------------------------------------------------------------
+  homarr:
+    image: ghcr.io/homarr-labs/homarr:latest
+    container_name: homarr
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./homarr/appdata:/appdata
+    environment:
+      SECRET_ENCRYPTION_KEY: ${HOMARR_ENCRYPTION_KEY:?Please set HOMARR_ENCRYPTION_KEY in your .env file}
+      BASE_URL: https://home.blueteam.au
+      NEXTAUTH_URL: https://home.blueteam.au
+      AUTH_PROVIDERS: oidc,credentials
+      AUTH_OIDC_CLIENT_NAME: authentik
+      AUTH_OIDC_CLIENT_ID: ${HOMARR_OIDC_CLIENT_ID:-}
+      AUTH_OIDC_CLIENT_SECRET: ${HOMARR_OIDC_CLIENT_SECRET:-}
+      AUTH_OIDC_ISSUER: https://auth.blueteam.au/application/o/${HOMARR_OIDC_SLUG:-homarr}/
+      AUTH_OIDC_URI: https://auth.blueteam.au/application/o/authorize
+      AUTH_OIDC_SCOPE_OVERWRITE: openid email profile groups
+      AUTH_OIDC_GROUPS_ATTRIBUTE: groups
+      AUTH_LOGOUT_REDIRECT_URL: https://auth.blueteam.au/application/o/${HOMARR_OIDC_SLUG:-homarr}/end-session/
+      # AUTH_OIDC_AUTO_LOGIN: "true"
+      TZ: ${TZ:-Australia/Adelaide}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.homarr.rule=Host(`home.blueteam.au`)"
+      - "traefik.http.routers.homarr.entrypoints=websecure"
+      - "traefik.http.routers.homarr.tls.certresolver=letsencrypt"
+      - "traefik.http.services.homarr.loadbalancer.server.port=7575"
+    depends_on:
+      - server
+    networks:
+      - proxy
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgresql_data:
+    driver: local
+
+# =============================================================================
+# Networks
+# authentik-internal: Isolated network between authentik services and postgres.
+#                     No external access - only inter-container traffic.
+# proxy:             Shared Traefik network. Services on this network are
+#                    discoverable by Traefik for automatic routing.
+#                    Defined in the main docker-compose.yml.
+# =============================================================================
+networks:
+  authentik-internal:
+    internal: true
+  proxy:
+    external: true
