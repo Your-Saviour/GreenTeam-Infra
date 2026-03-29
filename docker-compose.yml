@@ -19,7 +19,10 @@ services:
       - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$2y$$05$$gxakRHt5HcGQM3I3mJJvEuq9r4as6J4TQEp1gldCpzoNkF689b4iu"
     networks:
-      - proxy
+      proxy:
+        aliases:
+          - auth.blueteam.au
+          - home.blueteam.au
 
   dockhand:
     image: fnsys/dockhand:latest
