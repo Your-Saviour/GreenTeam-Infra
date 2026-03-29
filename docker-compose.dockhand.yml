@@ -196,10 +196,12 @@ services:
       - vaultwarden_data:/data
     environment:
       DOMAIN: https://vault.gt.blueteam.au
+      SIGNUPS_ALLOWED: "false"
       SSO_ENABLED: "true"
       SSO_CLIENT_ID: ${VAULTWARDEN_OIDC_CLIENT_ID:-}
       SSO_CLIENT_SECRET: ${VAULTWARDEN_OIDC_CLIENT_SECRET:-}
       SSO_AUTHORITY: https://auth.blueteam.au/application/o/${VAULTWARDEN_OIDC_SLUG:-vaultwarden}/
+      SSO_SCOPES: "email profile offline_access"
       TZ: ${TZ:-Australia/Adelaide}
     labels:
       - "traefik.enable=true"
