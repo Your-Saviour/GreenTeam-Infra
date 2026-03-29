@@ -2,14 +2,23 @@
 
 Docker infrastructure for the GreenTeam project. All services sit behind a Traefik reverse proxy with automatic HTTPS via Let's Encrypt.
 
-## Services
+## Containers
 
-| Service | Domain | Stack |
-|---------|--------|-------|
-| Traefik Dashboard | `traefik.gt.blueteam.au` | Core |
-| Dockhand | `dockhand.gt.blueteam.au` | Core |
-| authentik (SSO) | `auth.blueteam.au` | Dockhand |
-| Homarr (Dashboard) | `home.blueteam.au` | Dockhand |
+### Core Stack (`docker-compose.yml`)
+
+| Container | Image | Domain | Description |
+|-----------|-------|--------|-------------|
+| **traefik** | `traefik:latest` | `traefik.gt.blueteam.au` | Reverse proxy and TLS termination. Routes all incoming traffic to backend services via Docker label discovery. Dashboard is protected with basic auth. |
+| **dockhand** | `fnsys/dockhand:latest` | `dockhand.gt.blueteam.au` | Web UI for managing Docker Compose stacks. Provides a GUI to deploy, restart, and monitor containers on the host. |
+
+### Dockhand Services Stack (`docker-compose.dockhand.yml`)
+
+| Container | Image | Domain | Description |
+|-----------|-------|--------|-------------|
+| **authentik-server** | `ghcr.io/goauthentik/server:2026.2.1` | `auth.blueteam.au` | Identity provider handling SSO, OIDC, SAML, and LDAP. Serves the admin UI and all authentication flows. |
+| **authentik-worker** | `ghcr.io/goauthentik/server:2026.2.1` | — | Background worker for authentik. Handles emails, LDAP sync, and outpost management. Not exposed to the web. |
+| **authentik-postgresql** | `postgres:16-alpine` | — | PostgreSQL database for all authentik data, caching, and task queuing. Only accessible on the isolated internal network. |
+| **homarr** | `ghcr.io/homarr-labs/homarr:latest` | `home.blueteam.au` | Homepage dashboard with per-user boards. Authenticates via OIDC through authentik. Groups synced from authentik control which board each user sees. |
 
 ## Quick Start
 
