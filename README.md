@@ -11,6 +11,13 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 | **traefik** | `traefik:latest` | `traefik.gt.blueteam.au` | Reverse proxy and TLS termination. Routes all incoming traffic to backend services via Docker label discovery. Dashboard is protected with basic auth. |
 | **dockhand** | `fnsys/dockhand:latest` | `dockhand.gt.blueteam.au` | Web UI for managing Docker Compose stacks. Provides a GUI to deploy, restart, and monitor containers on the host. |
 
+### Wiki.js Stack (`wikijs/docker-compose.yml`)
+
+| Container | Image | Domain | Description |
+|-----------|-------|--------|-------------|
+| **wikijs** | `ghcr.io/requarks/wiki:2` | `wiki.blueteam.au` | Modern wiki engine with WYSIWYG and Markdown editing. Authenticates via OIDC through authentik (configured in Wiki.js admin UI). |
+| **wikijs-postgresql** | `postgres:16-alpine` | — | Dedicated PostgreSQL database for Wiki.js. Only accessible on the isolated internal network. |
+
 ### Dockhand Services Stack (`docker-compose.dockhand.yml`)
 
 | Container | Image | Domain | Description |
@@ -68,7 +75,8 @@ Internet (80/443)
     Traefik ──── proxy network ────┬── Dockhand
        |                           ├── authentik server
        |                           ├── Homarr
-       |                           └── Vaultwarden
+       |                           ├── Vaultwarden
+       |                           └── Wiki.js
        |
   HTTP → HTTPS redirect
   Let's Encrypt TLS (auto)
@@ -76,6 +84,10 @@ Internet (80/443)
 authentik-internal network (isolated)
   ├── authentik server
   ├── authentik worker
+  └── PostgreSQL
+
+wikijs-internal network (isolated)
+  ├── Wiki.js
   └── PostgreSQL
 ```
 
@@ -108,6 +120,7 @@ my-service:
 ```
 docker-compose.yml              # Core: Traefik + Dockhand
 docker-compose.dockhand.yml     # Services: authentik, Homarr, Vaultwarden
+wikijs/docker-compose.yml       # Wiki.js + dedicated PostgreSQL
 traefik/traefik.yml             # Traefik static configuration
 .env.example.dockhand           # Environment variable template
 ```
