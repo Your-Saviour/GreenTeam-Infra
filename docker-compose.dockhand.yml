@@ -147,6 +147,9 @@ services:
     image: ghcr.io/homarr-labs/homarr:latest
     container_name: homarr
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - homarr_data:/appdata
