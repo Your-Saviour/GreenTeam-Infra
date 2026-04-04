@@ -60,11 +60,46 @@ BROADCAST_WEBSOCKET_PORT = 8052
 BROADCAST_WEBSOCKET_PROTOCOL = 'http'
 BROADCAST_WEBSOCKET_VERIFY_CERT = False
 
-# ── Instance Registration ───────────────────────────────────────────────────
-# Required for provision_instance to work outside K8s.
-# Without this, awx-task crashes with "only intended for use in K8s installs".
+# ── Instance Registration & Execution ───────────────────────────────────────
+# IS_K8S must be False so AWX does not attempt to launch jobs as K8s pods.
+IS_K8S = False
+
+# CLUSTER_HOST_ID must match the hostname used in provision_instance.
+# This is how AWX decides work_type == 'local' (receptor work-command)
+# instead of trying to route to a remote execution node.
+CLUSTER_HOST_ID = 'awxtask'
+
 AWX_AUTO_DEPROVISION_INSTANCES = True
 SYSTEM_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, 'awx.testing.blueteam.au'))
+
+# Tell receptor where its socket lives (must match receptor.conf control-service)
+RECEPTOR_SOCKET_PATH = '/tmp/receptor/receptor.sock'
+RECEPTOR_RELEASE_WORK = True
+RECEPTOR_LOG_LEVEL = 'info'
+
+# ── Execution Environments ──────────────────────────────────────────────────
+# The EE image that will be used for "local" execution via ansible-runner.
+# Because IS_K8S=False and we use receptor work-command (worktype: local),
+# ansible-runner runs INSIDE the awx-task container — the EE image is only
+# used for metadata/defaults. The awx:24.6.1 image already has ansible-runner.
+GLOBAL_JOB_EXECUTION_ENVIRONMENTS = [
+    {'name': 'AWX EE (latest)', 'image': 'quay.io/ansible/awx-ee:latest'},
+]
+CONTROL_PLANE_EXECUTION_ENVIRONMENT = 'quay.io/ansible/awx-ee:latest'
+
+# ── Instance Group Defaults ─────────────────────────────────────────────────
+# These control the "default" execution queue. We do NOT want it to be a
+# container group (that's the K8s path). register_queue in the entrypoint
+# creates the group; these settings ensure it has no pod_spec_override.
+DEFAULT_EXECUTION_QUEUE_NAME = 'default'
+DEFAULT_CONTROL_PLANE_QUEUE_NAME = 'controlplane'
+
+# ── Job Isolation ───────────────────────────────────────────────────────────
+# Base path for ansible-runner's temporary job directories inside the container
+AWX_ISOLATION_BASE_PATH = '/tmp'
+AWX_ISOLATION_SHOW_PATHS = [
+    '/var/lib/awx/projects',
+]
 
 # ── Hosts & Security ────────────────────────────────────────────────────────
 ALLOWED_HOSTS = ['*']

@@ -126,13 +126,38 @@ services:
       - bash
       - -c
       - |
-        cp /shared/receptor /tmp/receptor && chmod +x /tmp/receptor
-        /tmp/receptor --config /etc/receptor/receptor.conf &
+        # Install receptor binary from init container
+        cp /shared/receptor /tmp/receptor-bin && chmod +x /tmp/receptor-bin
+
+        # Create writable receptor socket dir
+        mkdir -p /tmp/receptor
+
+        # Start receptor in the background
+        /tmp/receptor-bin --config /etc/receptor/receptor.conf &
         for i in $(seq 1 30); do
-          [ -S /tmp/receptor.sock ] && break
+          [ -S /tmp/receptor/receptor.sock ] && break
           sleep 1
         done
-        exec /usr/bin/launch_awx_task.sh
+
+        # Wait for DB migrations (from awx-init)
+        wait-for-migrations
+
+        # Register this node as hybrid (control + execution) with explicit hostname.
+        # Without --hostname, provision_instance enters K8s mode and creates
+        # the default instance group as a container group (needs K8s pods).
+        awx-manage provision_instance --hostname awxtask --node_type hybrid
+
+        # Ensure 'default' instance group exists as a NORMAL (non-container) group
+        # and assign this hybrid instance to it.
+        awx-manage register_queue --queuename default --hostnames awxtask
+
+        # Register the controlplane queue for management/project-update jobs
+        awx-manage register_queue --queuename controlplane --hostnames awxtask
+
+        # Register the default execution environment so jobs have an EE image
+        awx-manage register_default_execution_environments
+
+        exec supervisord -c /etc/supervisord_task.conf
     environment:
       DATABASE_HOST: postgres
       DATABASE_NAME: ${PG_DATABASE}
