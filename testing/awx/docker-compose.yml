@@ -112,6 +112,7 @@ services:
   awx-receptor:
     image: quay.io/ansible/receptor:latest
     container_name: awx-receptor
+    user: "1000:0"
     restart: unless-stopped
     command: receptor --config /etc/receptor/receptor.conf
     volumes:
