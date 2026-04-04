@@ -1,11 +1,67 @@
-# AWX custom settings
-# Mounted into /etc/tower/conf.d/custom.py (auto-loaded by AWX)
+# AWX production settings
+# Mounted to /etc/tower/settings.py (the primary file loaded by awx.settings.production)
+#
+# AWX's production.py clears DATABASES and SECRET_KEY, then loads this file.
+# Environment variables like DATABASE_HOST are NOT auto-read by AWX --
+# this file bridges env vars into Django settings.
+
+import os
+
+# ── Database ─────────────────────────────────────────────────────────────────
+DATABASES = {
+    'default': {
+        'ATOMIC_REQUESTS': True,
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DATABASE_NAME', 'awx'),
+        'USER': os.environ.get('DATABASE_USER', 'awx'),
+        'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
+        'HOST': os.environ.get('DATABASE_HOST', 'postgres'),
+        'PORT': os.environ.get('DATABASE_PORT', '5432'),
+    }
+}
+
+# ── Secret Key ───────────────────────────────────────────────────────────────
+# Read from env first, fall back to /etc/tower/SECRET_KEY file.
+_secret_key = os.environ.get('SECRET_KEY', '')
+if not _secret_key and os.path.exists('/etc/tower/SECRET_KEY'):
+    with open('/etc/tower/SECRET_KEY', 'rb') as f:
+        _secret_key = f.read().strip().decode()
+SECRET_KEY = _secret_key
+
+# ── Redis / Cache / Broker ───────────────────────────────────────────────────
+# Use TCP connections to the redis container (not unix sockets).
+_redis_host = os.environ.get('REDIS_HOST', 'redis')
+_redis_port = os.environ.get('REDIS_PORT', '6379')
+
+BROKER_URL = 'redis://{}:{}/0'.format(_redis_host, _redis_port)
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [BROKER_URL],
+            'capacity': 10000,
+            'group_expiry': 157784760,  # 5 years
+        },
+    },
+}
+
+CACHES = {
+    'default': {
+        'BACKEND': 'awx.main.cache.AWXRedisCache',
+        'LOCATION': 'redis://{}:{}/1'.format(_redis_host, _redis_port),
+    }
+}
+
+# ── Websocket ────────────────────────────────────────────────────────────────
+BROADCAST_WEBSOCKET_SECRET = SECRET_KEY
+
+# ── Hosts & Security ────────────────────────────────────────────────────────
+ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://awx.testing.blueteam.au",
+    'https://awx.testing.blueteam.au',
 ]
-
-ALLOWED_HOSTS = ["*"]
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True

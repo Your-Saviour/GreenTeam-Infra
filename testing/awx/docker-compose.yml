@@ -3,6 +3,13 @@
 #   1. Copy .env.example to .env and set all passwords/secrets
 #   2. Ensure the testing-proxy network exists (start testing core stack first)
 #   3. Start: docker compose up -d
+#
+# Architecture:
+#   - awx-web runs supervisord managing nginx (8052), uwsgi (8050), daphne (8051)
+#   - awx-task runs supervisord managing dispatcher, receiver, receptor
+#   - Settings are in config/settings.py mounted to /etc/tower/settings.py
+#     (AWX production.py clears DATABASES/SECRET_KEY and loads this file)
+#   - nginx.conf is overridden to fix non-root PID file permissions
 
 services:
   postgres:
@@ -58,7 +65,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DJANGO_SUPERUSER_PASSWORD: ${AWX_ADMIN_PASSWORD}
     volumes:
-      - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
+      - ./config/settings.py:/etc/tower/settings.py:ro
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,7 +94,8 @@ services:
     volumes:
       - awx-projects:/var/lib/awx/projects
       - awx-receptor:/var/run/receptor
-      - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
+      - ./config/settings.py:/etc/tower/settings.py:ro
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       awx-init:
         condition: service_completed_successfully
@@ -95,7 +104,7 @@ services:
       - "traefik.http.routers.awx-web.rule=Host(`awx.testing.blueteam.au`)"
       - "traefik.http.routers.awx-web.entrypoints=websecure"
       - "traefik.http.routers.awx-web.tls.certresolver=letsencrypt"
-      - "traefik.http.services.awx-web.loadbalancer.server.port=8013"
+      - "traefik.http.services.awx-web.loadbalancer.server.port=8052"
     networks:
       - testing-proxy
       - awx-internal
@@ -118,7 +127,8 @@ services:
     volumes:
       - awx-projects:/var/lib/awx/projects
       - awx-receptor:/var/run/receptor
-      - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
+      - ./config/settings.py:/etc/tower/settings.py:ro
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       awx-init:
         condition: service_completed_successfully
