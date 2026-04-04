@@ -109,29 +109,29 @@ services:
       - testing-proxy
       - awx-internal
 
-  awx-receptor:
+  awx-receptor-init:
     image: quay.io/ansible/receptor:latest
-    container_name: awx-receptor
-    user: "0:0"
-    restart: unless-stopped
-    command:
-      - sh
-      - -c
-      - |
-        chown 1000:0 /var/run/receptor
-        exec runuser -u '#1000' -g root -- receptor --config /etc/receptor/receptor.conf
+    container_name: awx-receptor-init
+    restart: "no"
+    entrypoint: ["sh", "-c", "cp /usr/bin/receptor /shared/receptor && chmod 755 /shared/receptor"]
     volumes:
-      - awx-receptor:/var/run/receptor
-      - ./config/receptor.conf:/etc/receptor/receptor.conf:ro
-    networks:
-      - awx-internal
+      - awx-receptor-bin:/shared
 
   awx-task:
     image: quay.io/ansible/awx:24.6.1
     container_name: awx-task
     hostname: awxtask
     restart: unless-stopped
-    command: /usr/bin/launch_awx_task.sh
+    command:
+      - bash
+      - -c
+      - |
+        /shared/receptor --config /etc/receptor/receptor.conf &
+        for i in $(seq 1 30); do
+          [ -S /var/run/receptor/receptor.sock ] && break
+          sleep 1
+        done
+        exec /usr/bin/launch_awx_task.sh
     environment:
       DATABASE_HOST: postgres
       DATABASE_NAME: ${PG_DATABASE}
@@ -144,14 +144,15 @@ services:
     volumes:
       - awx-projects:/var/lib/awx/projects
       - awx-receptor:/var/run/receptor
+      - awx-receptor-bin:/shared:ro
       - ./config/settings.py:/etc/tower/settings.py:ro
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/receptor.conf:/etc/receptor/receptor.conf:ro
     depends_on:
+      awx-receptor-init:
+        condition: service_completed_successfully
       awx-init:
         condition: service_completed_successfully
-      awx-receptor:
-        condition: service_started
     networks:
       - awx-internal
 
@@ -166,3 +167,4 @@ volumes:
   awx-redis-data:
   awx-projects:
   awx-receptor:
+  awx-receptor-bin:
