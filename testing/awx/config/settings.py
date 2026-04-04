@@ -56,6 +56,9 @@ CACHES = {
 
 # ── Websocket ────────────────────────────────────────────────────────────────
 BROADCAST_WEBSOCKET_SECRET = SECRET_KEY
+BROADCAST_WEBSOCKET_PORT = 8052
+BROADCAST_WEBSOCKET_PROTOCOL = 'http'
+BROADCAST_WEBSOCKET_VERIFY_CERT = False
 
 # ── Instance Registration ───────────────────────────────────────────────────
 # Required for provision_instance to work outside K8s.
