@@ -1,17 +1,29 @@
 # Wazuh 4.14.4 Testing Stack
 # Prerequisites:
-#   1. Generate certs: docker compose -f generate-certs.yml run --rm generator
-#   2. Copy .env.example to .env and set passwords
-#   3. Ensure vm.max_map_count=262144 on host: sudo sysctl -w vm.max_map_count=262144
-#   4. Start: docker compose up -d
+#   1. Copy .env.example to .env and set passwords
+#   2. Ensure vm.max_map_count=262144 on host: sudo sysctl -w vm.max_map_count=262144
+#   3. Start: docker compose up -d
 
 services:
+  wazuh-certs-generator:
+    image: wazuh/wazuh-certs-generator:0.0.4
+    hostname: wazuh-certs-generator
+    restart: "no"
+    environment:
+      - CERT_TOOL_VERSION=4.14
+    volumes:
+      - ./config/wazuh_indexer_ssl_certs/:/certificates/
+      - ./config/certs.yml:/config/certs.yml
+
   wazuh-indexer:
     image: wazuh/wazuh-indexer:4.14.4
     hostname: wazuh.indexer
     restart: unless-stopped
+    depends_on:
+      wazuh-certs-generator:
+        condition: service_completed_successfully
     environment:
-      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
       memlock:
         soft: -1

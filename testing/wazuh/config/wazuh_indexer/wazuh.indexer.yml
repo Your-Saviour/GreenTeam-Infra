@@ -51,3 +51,7 @@ plugins.security.system_indices.indices:
 
 plugins.security.allow_default_init_securityindex: true
 cluster.routing.allocation.disk.threshold_enabled: false
+
+# Disable KNN plugin circuit breaker (crashes on low-memory systems)
+knn.memory.circuit_breaker.enabled: false
+knn.plugin.enabled: false
