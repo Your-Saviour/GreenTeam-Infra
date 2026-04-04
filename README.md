@@ -118,12 +118,8 @@ docker compose up -d
 cd testing/awx
 cp .env.example .env
 # Edit .env — set passwords and generate SECRET_KEY: openssl rand -hex 32
-
-# First run — start web alone, migrate, then bring up the full stack
-docker compose up -d awx-web
-docker exec -it awx-web awx-manage migrate
-docker exec -it awx-web awx-manage createsuperuser --username admin --email admin@blueteam.au
 docker compose up -d
+# Database migration and admin user are created automatically on first start via init container
 ```
 
 ## Architecture

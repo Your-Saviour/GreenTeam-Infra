@@ -2,11 +2,7 @@
 # Prerequisites:
 #   1. Copy .env.example to .env and set all passwords/secrets
 #   2. Ensure the testing-proxy network exists (start testing core stack first)
-#   3. Start awx-web alone first: docker compose up -d awx-web
-#   4. First run only — migrate and create admin:
-#        docker exec -it awx-web awx-manage migrate
-#        docker exec -it awx-web awx-manage createsuperuser --username admin --email admin@blueteam.au
-#   5. Start the full stack: docker compose up -d
+#   3. Start: docker compose up -d
 
 services:
   postgres:
@@ -41,12 +37,42 @@ services:
     networks:
       - awx-internal
 
+  awx-init:
+    image: quay.io/ansible/awx:24.6.1
+    container_name: awx-init
+    restart: "no"
+    command: >
+      bash -c "
+        awx-manage migrate --noinput &&
+        awx-manage createsuperuser --username '${AWX_ADMIN_USER}' --email admin@blueteam.au --noinput 2>/dev/null;
+        awx-manage update_password --username '${AWX_ADMIN_USER}' --password '${AWX_ADMIN_PASSWORD}';
+        echo 'AWX init complete'
+      "
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_NAME: ${PG_DATABASE}
+      DATABASE_USER: ${PG_USER}
+      DATABASE_PASSWORD: ${PG_PASSWORD}
+      DATABASE_PORT: "5432"
+      REDIS_HOST: redis
+      SECRET_KEY: ${SECRET_KEY}
+      DJANGO_SUPERUSER_PASSWORD: ${AWX_ADMIN_PASSWORD}
+    volumes:
+      - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - awx-internal
+
   awx-web:
     image: quay.io/ansible/awx:24.6.1
     container_name: awx-web
     hostname: awxweb
     restart: unless-stopped
-    command: /usr/bin/launch_awx.sh
+    command: /usr/bin/launch_awx_web.sh
     environment:
       DATABASE_HOST: postgres
       DATABASE_NAME: ${PG_DATABASE}
@@ -62,10 +88,8 @@ services:
       - awx-receptor:/var/run/receptor
       - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      awx-init:
+        condition: service_completed_successfully
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.awx-web.rule=Host(`awx.testing.blueteam.au`)"
@@ -96,12 +120,8 @@ services:
       - awx-receptor:/var/run/receptor
       - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      awx-web:
-        condition: service_started
+      awx-init:
+        condition: service_completed_successfully
     networks:
       - awx-internal
 
