@@ -90,9 +90,39 @@ docker compose up -d
 
 # 2. Set up Wazuh
 cd wazuh
-docker compose -f generate-certs.yml run --rm generator
 cp .env.example .env
 # Ensure host has: sudo sysctl -w vm.max_map_count=262144
+docker compose up -d
+# Certs are auto-generated on first start via init container
+```
+
+**Firewall:** The Wazuh manager publishes agent ports directly on the host (not through Traefik). Ensure these are open in your firewall:
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 1514 | TCP | Agent registration |
+| 1515 | TCP | Agent communication |
+| 514 | UDP | Syslog collection |
+
+### Testing: AWX Stack (`testing/awx/docker-compose.yml`)
+
+| Container | Image | Domain | Description |
+|-----------|-------|--------|-------------|
+| **awx-web** | `quay.io/ansible/awx:24.6.1` | `awx.testing.blueteam.au` | AWX web UI and REST API for managing Ansible automation. |
+| **awx-task** | `quay.io/ansible/awx:24.6.1` | — | Background task runner that executes Ansible playbooks and jobs. |
+| **awx-postgres** | `postgres:16-alpine` | — | PostgreSQL database for AWX. Only accessible on the isolated internal network. |
+| **awx-redis** | `redis:7-alpine` | — | Redis message broker for AWX task coordination. Only accessible on the isolated internal network. |
+
+**Setup:**
+```bash
+cd testing/awx
+cp .env.example .env
+# Edit .env — set passwords and generate SECRET_KEY: openssl rand -hex 32
+
+# First run — start web alone, migrate, then bring up the full stack
+docker compose up -d awx-web
+docker exec -it awx-web awx-manage migrate
+docker exec -it awx-web awx-manage createsuperuser --username admin --email admin@blueteam.au
 docker compose up -d
 ```
 
@@ -123,6 +153,12 @@ wazuh-internal network (isolated)
   ├── Wazuh Indexer
   ├── Wazuh Manager
   └── Wazuh Dashboard
+
+awx-internal network (isolated)
+  ├── AWX Web
+  ├── AWX Task
+  ├── PostgreSQL
+  └── Redis
 ```
 
 - **`proxy`** — Shared network for Traefik service discovery. All web-facing containers join this.
@@ -157,6 +193,7 @@ docker-compose.dockhand.yml     # Services: authentik, Homarr, Vaultwarden
 wikijs/docker-compose.yml       # Wiki.js + dedicated PostgreSQL
 testing/docker-compose.yml       # Testing core: Traefik + Dockhand (*.testing.blueteam.au)
 testing/wazuh/docker-compose.yml # Wazuh SIEM testing stack
+testing/awx/docker-compose.yml  # AWX (Ansible) testing stack
 traefik/traefik.yml             # Traefik static configuration
 .env.example.dockhand           # Environment variable template
 ```
