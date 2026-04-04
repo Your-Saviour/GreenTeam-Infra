@@ -93,7 +93,6 @@ services:
       SECRET_KEY: ${SECRET_KEY}
     volumes:
       - awx-projects:/var/lib/awx/projects
-      - awx-receptor:/var/run/receptor
       - ./config/settings.py:/etc/tower/settings.py:ro
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -130,7 +129,7 @@ services:
         cp /shared/receptor /tmp/receptor && chmod +x /tmp/receptor
         /tmp/receptor --config /etc/receptor/receptor.conf &
         for i in $(seq 1 30); do
-          [ -S /var/run/receptor/receptor.sock ] && break
+          [ -S /tmp/receptor.sock ] && break
           sleep 1
         done
         exec /usr/bin/launch_awx_task.sh
@@ -145,7 +144,6 @@ services:
       SUPERVISOR_WEB_CONFIG_PATH: /etc/supervisord.conf
     volumes:
       - awx-projects:/var/lib/awx/projects
-      - awx-receptor:/var/run/receptor
       - awx-receptor-bin:/shared:ro
       - ./config/settings.py:/etc/tower/settings.py:ro
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -168,5 +166,4 @@ volumes:
   awx-postgres-data:
   awx-redis-data:
   awx-projects:
-  awx-receptor:
   awx-receptor-bin:
