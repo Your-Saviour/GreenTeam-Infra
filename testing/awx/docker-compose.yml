@@ -1,0 +1,118 @@
+# AWX 24.6.1 Testing Stack
+# Prerequisites:
+#   1. Copy .env.example to .env and set all passwords/secrets
+#   2. Ensure the testing-proxy network exists (start testing core stack first)
+#   3. Start awx-web alone first: docker compose up -d awx-web
+#   4. First run only — migrate and create admin:
+#        docker exec -it awx-web awx-manage migrate
+#        docker exec -it awx-web awx-manage createsuperuser --username admin --email admin@blueteam.au
+#   5. Start the full stack: docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: awx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DATABASE}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - awx-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - awx-internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: awx-redis
+    restart: unless-stopped
+    volumes:
+      - awx-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - awx-internal
+
+  awx-web:
+    image: quay.io/ansible/awx:24.6.1
+    container_name: awx-web
+    hostname: awxweb
+    restart: unless-stopped
+    command: /usr/bin/launch_awx.sh
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_NAME: ${PG_DATABASE}
+      DATABASE_USER: ${PG_USER}
+      DATABASE_PASSWORD: ${PG_PASSWORD}
+      DATABASE_PORT: "5432"
+      REDIS_HOST: redis
+      AWX_ADMIN_USER: ${AWX_ADMIN_USER}
+      AWX_ADMIN_PASSWORD: ${AWX_ADMIN_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+    volumes:
+      - awx-projects:/var/lib/awx/projects
+      - awx-receptor:/var/run/receptor
+      - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.awx-web.rule=Host(`awx.testing.blueteam.au`)"
+      - "traefik.http.routers.awx-web.entrypoints=websecure"
+      - "traefik.http.routers.awx-web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.awx-web.loadbalancer.server.port=8013"
+    networks:
+      - testing-proxy
+      - awx-internal
+
+  awx-task:
+    image: quay.io/ansible/awx:24.6.1
+    container_name: awx-task
+    hostname: awxtask
+    restart: unless-stopped
+    command: /usr/bin/launch_awx_task.sh
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_NAME: ${PG_DATABASE}
+      DATABASE_USER: ${PG_USER}
+      DATABASE_PASSWORD: ${PG_PASSWORD}
+      DATABASE_PORT: "5432"
+      REDIS_HOST: redis
+      SECRET_KEY: ${SECRET_KEY}
+      SUPERVISOR_WEB_CONFIG_PATH: /etc/supervisord.conf
+    volumes:
+      - awx-projects:/var/lib/awx/projects
+      - awx-receptor:/var/run/receptor
+      - ./config/settings.py:/etc/tower/conf.d/custom.py:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      awx-web:
+        condition: service_started
+    networks:
+      - awx-internal
+
+networks:
+  awx-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  awx-postgres-data:
+  awx-redis-data:
+  awx-projects:
+  awx-receptor:
