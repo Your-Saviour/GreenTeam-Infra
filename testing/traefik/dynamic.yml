@@ -1,0 +1,4 @@
+http:
+  serversTransports:
+    wazuh-transport:
+      insecureSkipVerify: true

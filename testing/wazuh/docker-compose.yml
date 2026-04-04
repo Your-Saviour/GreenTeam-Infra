@@ -118,8 +118,7 @@ services:
       - "traefik.http.routers.wazuh-dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.services.wazuh-dashboard.loadbalancer.server.port=5601"
       - "traefik.http.services.wazuh-dashboard.loadbalancer.server.scheme=https"
-      - "traefik.http.serversTransports.wazuh-transport.insecureSkipVerify=true"
-      - "traefik.http.services.wazuh-dashboard.loadbalancer.serverstransport=wazuh-transport"
+      - "traefik.http.services.wazuh-dashboard.loadbalancer.serverstransport=wazuh-transport@file"
     networks:
       - testing-proxy
       - wazuh-internal

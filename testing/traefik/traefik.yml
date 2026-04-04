@@ -23,3 +23,5 @@ providers:
   docker:
     exposedByDefault: false
     network: testing-proxy
+  file:
+    filename: /etc/traefik/dynamic.yml
