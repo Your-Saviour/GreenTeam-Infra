@@ -87,6 +87,7 @@ services:
       - ./config/wazuh_indexer_ssl_certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key
     networks:
       - wazuh-internal
+      - testing-proxy
 
   wazuh-dashboard:
     image: wazuh/wazuh-dashboard:4.14.4
