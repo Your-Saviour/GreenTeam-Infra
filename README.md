@@ -67,6 +67,35 @@ docker compose -f docker-compose.dockhand.yml up -d
    ```
 4. Restart Homarr: `docker compose -f docker-compose.dockhand.yml restart homarr`
 
+### Testing Core Stack (`testing/docker-compose.yml`)
+
+| Container | Image | Domain | Description |
+|-----------|-------|--------|-------------|
+| **testing-traefik** | `traefik:latest` | `traefik.testing.blueteam.au` | Reverse proxy for the testing environment. Dashboard protected with basic auth. |
+| **testing-dockhand** | `fnsys/dockhand:latest` | `dockhand.testing.blueteam.au` | Docker Compose management UI for the testing host. |
+
+### Testing: Wazuh Stack (`testing/wazuh/docker-compose.yml`)
+
+| Container | Image | Domain | Description |
+|-----------|-------|--------|-------------|
+| **wazuh-indexer** | `wazuh/wazuh-indexer:4.14.4` | — | OpenSearch-based storage and search engine for security data. Only accessible on the isolated internal network. |
+| **wazuh-manager** | `wazuh/wazuh-manager:4.14.4` | — | Core SIEM engine handling agent management, rules, and alerting. Publishes ports 1514/1515 (agents) and 514/udp (syslog). |
+| **wazuh-dashboard** | `wazuh/wazuh-dashboard:4.14.4` | `wazuh.testing.blueteam.au` | Web UI for Wazuh visualization and management. |
+
+**Setup:**
+```bash
+# 1. Start the testing core stack first (creates testing-proxy network)
+cd testing
+docker compose up -d
+
+# 2. Set up Wazuh
+cd wazuh
+docker compose -f generate-certs.yml run --rm generator
+cp .env.example .env
+# Ensure host has: sudo sysctl -w vm.max_map_count=262144
+docker compose up -d
+```
+
 ## Architecture
 
 ```
@@ -89,6 +118,11 @@ authentik-internal network (isolated)
 wikijs-internal network (isolated)
   ├── Wiki.js
   └── PostgreSQL
+
+wazuh-internal network (isolated)
+  ├── Wazuh Indexer
+  ├── Wazuh Manager
+  └── Wazuh Dashboard
 ```
 
 - **`proxy`** — Shared network for Traefik service discovery. All web-facing containers join this.
@@ -121,6 +155,8 @@ my-service:
 docker-compose.yml              # Core: Traefik + Dockhand
 docker-compose.dockhand.yml     # Services: authentik, Homarr, Vaultwarden
 wikijs/docker-compose.yml       # Wiki.js + dedicated PostgreSQL
+testing/docker-compose.yml       # Testing core: Traefik + Dockhand (*.testing.blueteam.au)
+testing/wazuh/docker-compose.yml # Wazuh SIEM testing stack
 traefik/traefik.yml             # Traefik static configuration
 .env.example.dockhand           # Environment variable template
 ```

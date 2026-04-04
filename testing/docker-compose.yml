@@ -1,0 +1,51 @@
+# Testing Core Stack — Traefik + Dockhand
+# Routes testing services on *.testing.blueteam.au
+
+services:
+  traefik:
+    image: traefik:latest
+    container_name: testing-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - testing-letsencrypt:/letsencrypt
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.testing-dashboard.rule=Host(`traefik.testing.blueteam.au`)"
+      - "traefik.http.routers.testing-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.testing-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.testing-dashboard.service=api@internal"
+      - "traefik.http.routers.testing-dashboard.middlewares=testing-dashboard-auth"
+      - "traefik.http.middlewares.testing-dashboard-auth.basicauth.users=admin:$$2y$$05$$gxakRHt5HcGQM3I3mJJvEuq9r4as6J4TQEp1gldCpzoNkF689b4iu"
+    networks:
+      - testing-proxy
+
+  dockhand:
+    image: fnsys/dockhand:latest
+    container_name: testing-dockhand
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - testing-dockhand_data:/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.testing-dockhand.rule=Host(`dockhand.testing.blueteam.au`)"
+      - "traefik.http.routers.testing-dockhand.entrypoints=websecure"
+      - "traefik.http.routers.testing-dockhand.tls.certresolver=letsencrypt"
+      - "traefik.http.services.testing-dockhand.loadbalancer.server.port=3000"
+    depends_on:
+      - traefik
+    networks:
+      - testing-proxy
+
+volumes:
+  testing-letsencrypt:
+  testing-dockhand_data:
+
+networks:
+  testing-proxy:
+    name: testing-proxy
