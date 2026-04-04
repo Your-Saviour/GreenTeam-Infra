@@ -126,7 +126,8 @@ services:
       - bash
       - -c
       - |
-        /shared/receptor --config /etc/receptor/receptor.conf &
+        cp /shared/receptor /tmp/receptor && chmod +x /tmp/receptor
+        /tmp/receptor --config /etc/receptor/receptor.conf &
         for i in $(seq 1 30); do
           [ -S /var/run/receptor/receptor.sock ] && break
           sleep 1
