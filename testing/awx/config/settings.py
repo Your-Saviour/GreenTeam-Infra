@@ -6,6 +6,7 @@
 # this file bridges env vars into Django settings.
 
 import os
+import uuid
 
 # ── Database ─────────────────────────────────────────────────────────────────
 DATABASES = {
@@ -60,6 +61,7 @@ BROADCAST_WEBSOCKET_SECRET = SECRET_KEY
 # Required for provision_instance to work outside K8s.
 # Without this, awx-task crashes with "only intended for use in K8s installs".
 AWX_AUTO_DEPROVISION_INSTANCES = True
+SYSTEM_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, 'awx.testing.blueteam.au'))
 
 # ── Hosts & Security ────────────────────────────────────────────────────────
 ALLOWED_HOSTS = ['*']
