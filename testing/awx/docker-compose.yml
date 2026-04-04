@@ -109,6 +109,17 @@ services:
       - testing-proxy
       - awx-internal
 
+  awx-receptor:
+    image: quay.io/ansible/receptor:latest
+    container_name: awx-receptor
+    restart: unless-stopped
+    command: receptor --config /etc/receptor/receptor.conf
+    volumes:
+      - awx-receptor:/var/run/receptor
+      - ./config/receptor.conf:/etc/receptor/receptor.conf:ro
+    networks:
+      - awx-internal
+
   awx-task:
     image: quay.io/ansible/awx:24.6.1
     container_name: awx-task
@@ -133,6 +144,8 @@ services:
     depends_on:
       awx-init:
         condition: service_completed_successfully
+      awx-receptor:
+        condition: service_started
     networks:
       - awx-internal
 
