@@ -112,14 +112,13 @@ services:
   awx-receptor:
     image: quay.io/ansible/receptor:latest
     container_name: awx-receptor
-    user: "0:0"
     restart: unless-stopped
     command:
       - sh
       - -c
       - |
-        chmod 777 /var/run/receptor
-        exec receptor --config /etc/receptor/receptor.conf
+        chown 1000:0 /var/run/receptor
+        exec runuser -u '#1000' -g '#0' -- receptor --config /etc/receptor/receptor.conf
     volumes:
       - awx-receptor:/var/run/receptor
       - ./config/receptor.conf:/etc/receptor/receptor.conf:ro
