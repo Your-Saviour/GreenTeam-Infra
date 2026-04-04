@@ -56,6 +56,11 @@ CACHES = {
 # ── Websocket ────────────────────────────────────────────────────────────────
 BROADCAST_WEBSOCKET_SECRET = SECRET_KEY
 
+# ── Instance Registration ───────────────────────────────────────────────────
+# Required for provision_instance to work outside K8s.
+# Without this, awx-task crashes with "only intended for use in K8s installs".
+AWX_AUTO_DEPROVISION_INSTANCES = True
+
 # ── Hosts & Security ────────────────────────────────────────────────────────
 ALLOWED_HOSTS = ['*']
 
