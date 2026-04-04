@@ -112,6 +112,7 @@ services:
   awx-receptor-init:
     image: quay.io/ansible/receptor:latest
     container_name: awx-receptor-init
+    user: "0:0"
     restart: "no"
     entrypoint: ["sh", "-c", "cp /usr/bin/receptor /shared/receptor && chmod 755 /shared/receptor"]
     volumes:
