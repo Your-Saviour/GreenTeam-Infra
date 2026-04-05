@@ -119,7 +119,7 @@ services:
       - -c
       - |
         mkdir -p /awx/projects /awx/job_tmp
-        cp -rn /source/* /awx/projects/ 2>/dev/null || true
+        cp -r /source/* /awx/projects/ 2>/dev/null || true
         chown -R 1000:0 /awx
         chmod -R 775 /awx
     volumes:
