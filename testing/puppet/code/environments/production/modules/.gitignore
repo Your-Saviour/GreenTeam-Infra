@@ -1,0 +1,4 @@
+# Forge modules installed by r10k — don't commit these
+*
+!.gitignore
+!base_hardening/
