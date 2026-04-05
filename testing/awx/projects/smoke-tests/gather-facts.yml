@@ -11,10 +11,10 @@
       ansible.builtin.debug:
         msg: "Python {{ ansible_python_version }}"
 
-    - name: Show hostname and IPs
+    - name: Show hostname
       ansible.builtin.debug:
-        msg: "Hostname: {{ ansible_hostname }}, IPs: {{ ansible_all_ipv4_addresses }}"
+        msg: "Hostname: {{ ansible_hostname }}, FQDN: {{ ansible_fqdn | default('N/A') }}"
 
     - name: Show memory
       ansible.builtin.debug:
-        msg: "Total RAM: {{ ansible_memtotal_mb }} MB, Free: {{ ansible_memfree_mb }} MB"
+        msg: "Total RAM: {{ ansible_memtotal_mb }} MB"
