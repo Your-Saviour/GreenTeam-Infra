@@ -1,0 +1,20 @@
+---
+- name: Gather and display system facts
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Show OS info
+      ansible.builtin.debug:
+        msg: "{{ ansible_distribution }} {{ ansible_distribution_version }} ({{ ansible_os_family }})"
+
+    - name: Show Python version
+      ansible.builtin.debug:
+        msg: "Python {{ ansible_python_version }}"
+
+    - name: Show hostname and IPs
+      ansible.builtin.debug:
+        msg: "Hostname: {{ ansible_hostname }}, IPs: {{ ansible_all_ipv4_addresses }}"
+
+    - name: Show memory
+      ansible.builtin.debug:
+        msg: "Total RAM: {{ ansible_memtotal_mb }} MB, Free: {{ ansible_memfree_mb }} MB"

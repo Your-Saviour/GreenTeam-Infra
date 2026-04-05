@@ -1,0 +1,23 @@
+---
+- name: Run basic shell commands
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Show current user
+      ansible.builtin.command: whoami
+      register: whoami_result
+
+    - name: Show working directory
+      ansible.builtin.command: pwd
+      register: pwd_result
+
+    - name: Show uptime
+      ansible.builtin.command: uptime
+      register: uptime_result
+
+    - name: Display results
+      ansible.builtin.debug:
+        msg:
+          - "User: {{ whoami_result.stdout }}"
+          - "Working dir: {{ pwd_result.stdout }}"
+          - "Uptime: {{ uptime_result.stdout }}"

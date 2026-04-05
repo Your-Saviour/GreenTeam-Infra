@@ -1,0 +1,11 @@
+---
+- name: Ping test
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Ping localhost
+      ansible.builtin.ping:
+
+    - name: Print success
+      ansible.builtin.debug:
+        msg: "AWX job execution is working!"
