@@ -82,6 +82,8 @@ services:
       - "traefik.http.routers.guacamole.rule=Host(`guacamole.testing.blueteam.au`)"
       - "traefik.http.routers.guacamole.entrypoints=websecure"
       - "traefik.http.routers.guacamole.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.guacamole.middlewares=guacamole-prefix"
+      - "traefik.http.middlewares.guacamole-prefix.addprefix.prefix=/guacamole"
       - "traefik.http.services.guacamole.loadbalancer.server.port=8080"
     networks:
       - guacamole-internal
