@@ -100,7 +100,6 @@ services:
       - cluster.name=${CLUSTER_NAME}
       - discovery.seed_hosts=es02,es03
       - cluster.initial_master_nodes=es01,es02,es03
-      - network.publish_host=es01
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
       - bootstrap.memory_lock=true
       - xpack.security.enabled=true
@@ -177,6 +176,7 @@ services:
       retries: 10
     networks:
       - elastic-internal
+      - testing-proxy
 
   es03:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
@@ -218,6 +218,7 @@ services:
       retries: 10
     networks:
       - elastic-internal
+      - testing-proxy
 
   # ─── Kibana ───────────────────────────────────────────────────────────────
   kibana:
