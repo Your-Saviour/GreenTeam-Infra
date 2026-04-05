@@ -54,6 +54,9 @@ services:
       PUPPET_CERTNAME: puppet
       AUTOSIGN: "true"
       PUPPETSERVER_JAVA_ARGS: ${PUPPETSERVER_JAVA_ARGS:--Xms512m -Xmx512m}
+      PUPPET_REPORTS: puppetdb
+      PUPPET_STORECONFIGS: "true"
+      PUPPET_STORECONFIGS_BACKEND: puppetdb
       DNS_ALT_NAMES: "puppet,puppet-server,puppetserver,puppet.testing.blueteam.au"
     volumes:
       - ./config/80-ca.sh:/docker-entrypoint.d/80-ca.sh:ro
