@@ -112,7 +112,7 @@ services:
       - "traefik.http.routers.puppet-board.rule=Host(`puppet.testing.blueteam.au`)"
       - "traefik.http.routers.puppet-board.entrypoints=websecure"
       - "traefik.http.routers.puppet-board.tls.certresolver=letsencrypt"
-      - "traefik.http.services.puppet-board.loadbalancer.server.port=8000"
+      - "traefik.http.services.puppet-board.loadbalancer.server.port=80"
     networks:
       - puppet-internal
       - testing-proxy
