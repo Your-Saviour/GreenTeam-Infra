@@ -1,10 +1,25 @@
-#!/bin/bash
-# Wrapper for ansible-runner worker to fix Docker/podman stream compatibility.
-# 1. Redirects stderr (Docker warnings/tracebacks) to a log file
-# 2. Filters stdout to only pass through valid JSON lines (non-empty, starts with {)
-#    because Docker adds empty lines and non-JSON output that breaks AWX's stream parser.
-/var/lib/awx/venv/awx/bin/ansible-runner "$@" 2>/tmp/ansible-runner-stderr.log | while IFS= read -r line; do
-  case "$line" in
-    "{"*) printf '%s\n' "$line" ;;
-  esac
-done
+#!/usr/bin/env python3
+"""Wrapper for ansible-runner worker that filters non-JSON lines from stdout.
+
+Docker (masquerading as podman) adds empty lines and non-JSON output that
+break AWX's ansible_runner.streaming.Processor JSON parser. This wrapper
+only passes through lines that are valid JSON objects.
+"""
+import subprocess
+import sys
+
+proc = subprocess.Popen(
+    ['/var/lib/awx/venv/awx/bin/ansible-runner'] + sys.argv[1:],
+    stdin=sys.stdin,
+    stdout=subprocess.PIPE,
+    stderr=open('/tmp/ansible-runner-stderr.log', 'w'),
+)
+
+for line in proc.stdout:
+    stripped = line.strip()
+    if stripped and stripped.startswith(b'{'):
+        sys.stdout.buffer.write(line)
+        sys.stdout.buffer.flush()
+
+proc.wait()
+sys.exit(proc.returncode)
