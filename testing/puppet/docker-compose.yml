@@ -104,6 +104,7 @@ services:
     environment:
       PUPPETDB_HOST: puppetdb
       PUPPETDB_PORT: "8080"
+      SECRET_KEY: ${PUPPETBOARD_SECRET_KEY:?Please set PUPPETBOARD_SECRET_KEY in your .env file}
       ENABLE_CATALOG: "true"
       ENABLE_QUERY: "true"
       DEFAULT_ENVIRONMENT: production
