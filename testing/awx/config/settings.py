@@ -102,6 +102,8 @@ AWX_ISOLATION_SHOW_PATHS = [
     '/var/lib/awx/projects',
 ]
 DEFAULT_CONTAINER_RUNTIME = 'docker'
+# Override default podman-specific network flag (slirp4netns doesn't exist in Docker)
+DEFAULT_CONTAINER_RUN_OPTIONS = ['--network', 'host']
 
 # ── Hosts & Security ────────────────────────────────────────────────────────
 ALLOWED_HOSTS = ['*']
