@@ -278,7 +278,7 @@ services:
 
   # ─── Fleet Server ─────────────────────────────────────────────────────────
   fleet-server:
-    image: docker.elastic.co/beats/elastic-agent:${STACK_VERSION}
+    image: docker.elastic.co/elastic-agent/elastic-agent:${STACK_VERSION}
     container_name: elastic-fleet-server
     hostname: fleet-server
     user: root
