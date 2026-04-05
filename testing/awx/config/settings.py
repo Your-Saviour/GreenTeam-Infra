@@ -95,11 +95,13 @@ DEFAULT_EXECUTION_QUEUE_NAME = 'default'
 DEFAULT_CONTROL_PLANE_QUEUE_NAME = 'controlplane'
 
 # ── Job Isolation ───────────────────────────────────────────────────────────
-# Base path for ansible-runner's temporary job directories inside the container
+# Disable process isolation (no podman/docker available inside the container).
+# Jobs run directly inside awx-task via ansible-runner.
 AWX_ISOLATION_BASE_PATH = '/tmp'
 AWX_ISOLATION_SHOW_PATHS = [
     '/var/lib/awx/projects',
 ]
+DEFAULT_CONTAINER_RUNTIME = 'docker'
 
 # ── Hosts & Security ────────────────────────────────────────────────────────
 ALLOWED_HOSTS = ['*']
