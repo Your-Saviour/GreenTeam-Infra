@@ -183,7 +183,7 @@ services:
 
         # Install Ansible collections required by manual projects
         for req in /var/lib/awx/projects/*/collections/requirements.yml; do
-          [ -f "$req" ] && ansible-galaxy collection install -r "$req" --force || true
+          [ -f "$$req" ] && ansible-galaxy collection install -r "$$req" --force || true
         done
 
         exec supervisord -c /etc/supervisord_task.conf
