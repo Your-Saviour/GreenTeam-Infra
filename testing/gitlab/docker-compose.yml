@@ -1,0 +1,165 @@
+# GitLab CE Testing Stack (GitLab + PostgreSQL + Redis + Runner + Container Registry)
+# Prerequisites:
+#   1. Copy .env.example to .env and generate secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Start: docker compose up -d
+#   4. First start takes 3-5 minutes — GitLab runs migrations on initial boot
+#   5. After GitLab is healthy, register the runner (see .env.example for instructions)
+#
+# Resource requirements: ~4GB RAM minimum (GitLab ~3GB + PostgreSQL + Redis + Runner)
+#
+# Notes:
+#   - Default root password is set via GITLAB_ROOT_PASSWORD on first start only
+#   - The runner requires manual registration after GitLab is up (see .env.example)
+#   - Container registry is available at registry.testing.blueteam.au
+#   - GitLab web UI is available at gitlab.testing.blueteam.au
+#   - SSH git access is available on host port 2222
+
+services:
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: gitlab-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - gitlab_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${GITLAB_DB_NAME:-gitlabhq_production}
+      POSTGRES_USER: ${GITLAB_DB_USER:-gitlab}
+      POSTGRES_PASSWORD: ${GITLAB_DB_PASSWORD:?Please set GITLAB_DB_PASSWORD in your .env file}
+    networks:
+      - gitlab-internal
+
+  # ─── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: gitlab-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      start_period: 10s
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - gitlab_redis_data:/data
+    networks:
+      - gitlab-internal
+
+  # ─── GitLab CE ───────────────────────────────────────────────────────────────
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab-app
+    restart: unless-stopped
+    hostname: gitlab.testing.blueteam.au
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "2222:22"
+    shm_size: '256m'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/-/readiness || exit 1"]
+      start_period: 300s
+      interval: 30s
+      retries: 10
+      timeout: 10s
+    environment:
+      GITLAB_ROOT_PASSWORD: ${GITLAB_ROOT_PASSWORD:?Please set GITLAB_ROOT_PASSWORD in your .env file}
+      GITLAB_OMNIBUS_CONFIG: |
+        # External URL (used for links, redirects, and clone URLs)
+        external_url 'https://gitlab.testing.blueteam.au'
+
+        # Listen on plain HTTP internally — Traefik handles TLS termination
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+
+        # ── External PostgreSQL ──
+        postgresql['enable'] = false
+        gitlab_rails['db_adapter'] = 'postgresql'
+        gitlab_rails['db_encoding'] = 'utf8'
+        gitlab_rails['db_host'] = 'postgres'
+        gitlab_rails['db_port'] = 5432
+        gitlab_rails['db_database'] = '${GITLAB_DB_NAME:-gitlabhq_production}'
+        gitlab_rails['db_username'] = '${GITLAB_DB_USER:-gitlab}'
+        gitlab_rails['db_password'] = '${GITLAB_DB_PASSWORD}'
+
+        # ── External Redis ──
+        redis['enable'] = false
+        gitlab_rails['redis_host'] = 'redis'
+        gitlab_rails['redis_port'] = 6379
+
+        # ── Container Registry ──
+        registry_external_url 'https://registry.testing.blueteam.au'
+        gitlab_rails['registry_enabled'] = true
+        registry['enable'] = true
+        registry_nginx['listen_port'] = 5050
+        registry_nginx['listen_https'] = false
+
+        # ── SSH ──
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+
+        # ── Resource tuning (testing environment) ──
+        puma['workers'] = 2
+        sidekiq['concurrency'] = 5
+        prometheus_monitoring['enable'] = false
+
+        # ── Initial root password (first start only) ──
+        gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD}'
+    volumes:
+      - gitlab_config:/etc/gitlab
+      - gitlab_data:/var/opt/gitlab
+      - gitlab_logs:/var/log/gitlab
+    labels:
+      # ── GitLab Web UI ──
+      - "traefik.enable=true"
+      - "traefik.http.routers.gitlab.rule=Host(`gitlab.testing.blueteam.au`)"
+      - "traefik.http.routers.gitlab.entrypoints=websecure"
+      - "traefik.http.routers.gitlab.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gitlab.loadbalancer.server.port=80"
+      # ── Container Registry ──
+      - "traefik.http.routers.gitlab-registry.rule=Host(`registry.testing.blueteam.au`)"
+      - "traefik.http.routers.gitlab-registry.entrypoints=websecure"
+      - "traefik.http.routers.gitlab-registry.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.gitlab-registry.service=gitlab-registry"
+      - "traefik.http.services.gitlab-registry.loadbalancer.server.port=5050"
+    networks:
+      - gitlab-internal
+      - testing-proxy
+
+  # ─── GitLab Runner ───────────────────────────────────────────────────────────
+  runner:
+    image: gitlab/gitlab-runner:latest
+    container_name: gitlab-runner
+    restart: unless-stopped
+    depends_on:
+      gitlab:
+        condition: service_healthy
+    volumes:
+      - gitlab_runner_config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gitlab-internal
+
+networks:
+  gitlab-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  gitlab_postgres_data:
+  gitlab_redis_data:
+  gitlab_config:
+  gitlab_data:
+  gitlab_logs:
+  gitlab_runner_config:
