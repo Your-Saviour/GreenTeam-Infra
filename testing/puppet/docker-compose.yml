@@ -41,6 +41,8 @@ services:
     container_name: puppet-server
     hostname: puppet
     restart: unless-stopped
+    ports:
+      - "8140:8140"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS --insecure https://localhost:8140/status/v1/simple"]
       start_period: 180s
