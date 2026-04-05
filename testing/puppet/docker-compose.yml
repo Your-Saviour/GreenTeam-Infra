@@ -54,7 +54,7 @@ services:
       PUPPET_CERTNAME: puppet
       AUTOSIGN: "true"
       PUPPETSERVER_JAVA_ARGS: ${PUPPETSERVER_JAVA_ARGS:--Xms512m -Xmx512m}
-      DNS_ALT_NAMES: "puppet,puppet-server,puppetserver"
+      DNS_ALT_NAMES: "puppet,puppet-server,puppetserver,puppet.testing.blueteam.au"
     volumes:
       - puppet_server_code:/etc/puppetlabs/code
       - puppet_server_config:/etc/puppetlabs/puppet
