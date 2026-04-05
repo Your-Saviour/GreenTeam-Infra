@@ -77,7 +77,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/status/v1/services/puppetdb-status || exit 1"]
-      start_period: 60s
+      start_period: 120s
       interval: 30s
       retries: 10
       timeout: 10s
@@ -91,7 +91,7 @@ services:
       PUPPETDB_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
       PUPPETDB_JAVA_ARGS: ${PUPPETDB_JAVA_ARGS:--Xms256m -Xmx256m}
     volumes:
-      - puppet_puppetdb_ssl:/etc/puppetlabs/puppet/ssl
+      - puppet_puppetdb_certs:/opt/puppetlabs/server/data/puppetdb/certs
     networks:
       - puppet-internal
 
@@ -131,4 +131,4 @@ volumes:
   puppet_postgres_data:
   puppet_server_config:
   puppet_server_data:
-  puppet_puppetdb_ssl:
+  puppet_puppetdb_certs:
