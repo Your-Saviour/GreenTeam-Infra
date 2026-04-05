@@ -1,0 +1,78 @@
+---
+- name: Destroy Vultr VM
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - defaults/main.yml
+
+  environment:
+    VULTR_API_KEY: "{{ lookup('env', 'VULTR_API_KEY') }}"
+
+  vars:
+    cloudflare_api_key: "{{ lookup('env', 'CLOUDFLARE_API_KEY') }}"
+
+  tasks:
+
+    # -- Validate inputs --
+
+    - name: Validate VULTR_API_KEY is set
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'VULTR_API_KEY') | length > 0
+        fail_msg: >-
+          VULTR_API_KEY not set. Configure AWX Custom Credential Type.
+
+    - name: Validate CLOUDFLARE_API_KEY is set
+      ansible.builtin.assert:
+        that:
+          - cloudflare_api_key | length > 0
+        fail_msg: >-
+          CLOUDFLARE_API_KEY not set. Configure AWX Custom Credential Type.
+      when: not (skip_dns | bool)
+
+    - name: Validate destroy_label is provided
+      ansible.builtin.assert:
+        that:
+          - destroy_label is defined
+          - destroy_label | length > 0
+        fail_msg: >-
+          destroy_label must be provided (e.g. 'awx-vm-Ab3x').
+          Check the create job output for the full instance label.
+
+    # -- Remove instance --
+
+    - name: Remove Vultr instance
+      vultr.cloud.instance:
+        label: "{{ destroy_label }}"
+        region: "{{ vm_region }}"
+        state: absent
+
+    # -- Remove DNS record --
+
+    - name: Remove Cloudflare DNS record
+      community.general.cloudflare_dns:
+        zone: "{{ domain_name }}"
+        record: "{{ destroy_hostname }}"
+        type: A
+        state: absent
+        api_token: "{{ cloudflare_api_key }}"
+      when:
+        - not (skip_dns | bool)
+        - destroy_hostname is defined
+        - destroy_hostname | length > 0
+
+    # -- Remove SSH key from Vultr --
+
+    - name: Remove SSH key from Vultr
+      vultr.cloud.ssh_key:
+        name: "{{ destroy_ssh_key_name }}"
+        state: absent
+      when:
+        - destroy_ssh_key_name is defined
+        - destroy_ssh_key_name | length > 0
+
+    - name: Destroy complete
+      ansible.builtin.debug:
+        msg: "Instance '{{ destroy_label }}' destroyed successfully."

@@ -181,6 +181,11 @@ services:
         # Register the default execution environment so jobs have an EE image
         awx-manage register_default_execution_environments
 
+        # Install Ansible collections required by manual projects
+        for req in /var/lib/awx/projects/*/collections/requirements.yml; do
+          [ -f "$req" ] && ansible-galaxy collection install -r "$req" --force || true
+        done
+
         exec supervisord -c /etc/supervisord_task.conf
     environment:
       DATABASE_HOST: postgres

@@ -1,0 +1,130 @@
+---
+- name: Create Vultr VM
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - defaults/main.yml
+
+  environment:
+    VULTR_API_KEY: "{{ lookup('env', 'VULTR_API_KEY') }}"
+
+  vars:
+    cloudflare_api_key: "{{ lookup('env', 'CLOUDFLARE_API_KEY') }}"
+    _vm_tags_list: "{{ (vm_tags | split(',')) | map('trim') | list }}"
+
+  tasks:
+
+    # -- Validate credentials --
+
+    - name: Validate VULTR_API_KEY is set
+      ansible.builtin.assert:
+        that:
+          - lookup('env', 'VULTR_API_KEY') | length > 0
+        fail_msg: >-
+          VULTR_API_KEY not set. Create an AWX Custom Credential Type
+          that injects VULTR_API_KEY as an environment variable.
+
+    - name: Validate CLOUDFLARE_API_KEY is set
+      ansible.builtin.assert:
+        that:
+          - cloudflare_api_key | length > 0
+        fail_msg: >-
+          CLOUDFLARE_API_KEY not set. Create an AWX Custom Credential Type
+          that injects CLOUDFLARE_API_KEY as an environment variable.
+      when: not (skip_dns | bool)
+
+    # -- Generate deployment ID --
+
+    - name: Generate deployment ID
+      ansible.builtin.set_fact:
+        deployment_id: "{{ lookup('community.general.random_string', length=4, upper=true, lower=true, numbers=true, special=false) }}"
+
+    - name: Print deployment info
+      ansible.builtin.debug:
+        msg: >-
+          DEPLOYMENT_ID={{ deployment_id }} |
+          Label={{ vm_label }} |
+          Plan={{ vm_plan }} |
+          Region={{ vm_region }} |
+          OS={{ vm_os }}
+
+    # -- SSH keypair --
+
+    - name: Ensure SSH key directory exists
+      ansible.builtin.file:
+        path: "{{ ssh_key_path | dirname }}"
+        state: directory
+        mode: '0755'
+
+    - name: Remove existing SSH keypair
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ ssh_key_path }}"
+        - "{{ ssh_key_path }}.pub"
+
+    - name: Generate SSH keypair
+      ansible.builtin.command:
+        cmd: "ssh-keygen -t ed25519 -f {{ ssh_key_path }} -N '' -q"
+
+    - name: Set SSH key permissions
+      ansible.builtin.file:
+        path: "{{ ssh_key_path }}"
+        mode: '0600'
+
+    # -- Upload SSH key to Vultr --
+
+    - name: Ensure SSH key exists in Vultr
+      vultr.cloud.ssh_key:
+        name: "{{ ssh_key_name }}-{{ deployment_id }}"
+        ssh_key: "{{ lookup('file', ssh_key_path + '.pub') }}"
+
+    # -- Create instance --
+
+    - name: Create Vultr instance
+      vultr.cloud.instance:
+        label: "{{ vm_label }}-{{ deployment_id }}"
+        hostname: "{{ vm_hostname }}-{{ deployment_id }}"
+        plan: "{{ vm_plan }}"
+        ddos_protection: "{{ vm_ddos_protection | bool }}"
+        backups: "{{ vm_backups | bool }}"
+        enable_ipv6: "{{ vm_enable_ipv6 | bool }}"
+        region: "{{ vm_region }}"
+        os: "{{ vm_os }}"
+        ssh_keys:
+          - "{{ ssh_key_name }}-{{ deployment_id }}"
+        tags: "{{ _vm_tags_list + [deployment_id] }}"
+      register: vultr_result
+
+    # -- DNS --
+
+    - name: Create Cloudflare DNS record
+      community.general.cloudflare_dns:
+        zone: "{{ domain_name }}"
+        record: "{{ vm_hostname }}-{{ deployment_id }}"
+        type: A
+        value: "{{ vultr_result.vultr_instance.main_ip }}"
+        api_token: "{{ cloudflare_api_key }}"
+        solo: true
+      when: not (skip_dns | bool)
+
+    # -- Summary --
+
+    - name: Deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "=========== DEPLOYMENT COMPLETE ==========="
+          - "Deployment ID: {{ deployment_id }}"
+          - "Instance:      {{ vultr_result.vultr_instance.label }}"
+          - "IP:            {{ vultr_result.vultr_instance.main_ip }}"
+          - "Region:        {{ vultr_result.vultr_instance.region }}"
+          - "Plan:          {{ vultr_result.vultr_instance.plan }}"
+          - "OS:            {{ vm_os }}"
+          - "DNS:           {{ vm_hostname }}-{{ deployment_id }}.{{ domain_name }}"
+          - "SSH:           ssh -i {{ ssh_key_path }} root@{{ vultr_result.vultr_instance.main_ip }}"
+          - "Password:      {{ vultr_result.vultr_instance.default_password | default('N/A') }}"
+          - "SSH Key Name:  {{ ssh_key_name }}-{{ deployment_id }}"
+          - "============================================"

@@ -1,0 +1,21 @@
+# Default values for AWX survey variables.
+# Override any of these via AWX survey prompts or extra vars at launch time.
+
+# Instance configuration
+vm_label: "awx-vm"
+vm_hostname: "awx-vm"
+vm_plan: "vc2-1c-1gb"
+vm_region: "mel"
+vm_os: "Ubuntu 24.04 LTS x64"
+vm_ddos_protection: false
+vm_backups: false
+vm_enable_ipv6: false
+vm_tags: "testing,awx"
+
+# SSH key settings
+ssh_key_name: "awx-deploy"
+ssh_key_path: "/tmp/awx-deploy-key"
+
+# DNS configuration
+domain_name: "ye-et.com"
+skip_dns: false
