@@ -83,19 +83,6 @@ services:
           -d "{\"password\":\"$${KIBANA_SYSTEM_PASSWORD}\"}";
 
         echo "";
-        echo "Creating Fleet Server service token...";
-        FLEET_TOKEN=$$(curl -s -X POST -u "elastic:$${ELASTIC_PASSWORD}" \
-          -H "Content-Type: application/json" \
-          http://es01:9200/_security/service/elastic/fleet-server/credential/token/fleet-token-1 \
-          | sed -n "s/.*\"value\":\"\([^\"]*\)\".*/\1/p");
-        if [ -z "$${FLEET_TOKEN}" ]; then
-          echo "Token may already exist, fetching...";
-          FLEET_TOKEN=$$(curl -s -X GET -u "elastic:$${ELASTIC_PASSWORD}" \
-            http://es01:9200/_security/service/elastic/fleet-server/credential \
-            | sed -n "s/.*\"value\":\"\([^\"]*\)\".*/\1/p");
-        fi;
-        echo "$${FLEET_TOKEN}" > config/certs/.fleet_token;
-
         echo "Setup complete!";
         touch config/certs/.setup_complete;
       '
@@ -285,24 +272,16 @@ services:
     depends_on:
       kibana:
         condition: service_healthy
-    volumes:
-      - elastic-certs:/usr/share/elastic-agent/certs:ro
-    entrypoint: >
-      bash -c '
-        echo "Waiting for setup to complete...";
-        until [ -f /usr/share/elastic-agent/certs/.setup_complete ]; do
-          sleep 2;
-        done;
-        export FLEET_SERVER_SERVICE_TOKEN=$$(cat /usr/share/elastic-agent/certs/.fleet_token);
-        exec /usr/bin/tini -- /usr/local/bin/docker-entrypoint -e
-      '
     environment:
       - FLEET_SERVER_ENABLE=true
       - FLEET_SERVER_POLICY_ID=fleet-server-policy
       - FLEET_SERVER_ELASTICSEARCH_HOST=http://es01:9200
-      - KIBANA_HOST=http://kibana:5601
-      - FLEET_URL=https://fleet.testing.blueteam.au
       - FLEET_SERVER_INSECURE_HTTP=true
+      - KIBANA_HOST=http://kibana:5601
+      - KIBANA_FLEET_SETUP=1
+      - KIBANA_FLEET_USERNAME=elastic
+      - KIBANA_FLEET_PASSWORD=${ELASTIC_PASSWORD}
+      - FLEET_URL=https://fleet.testing.blueteam.au
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.elastic-fleet.rule=Host(`fleet.testing.blueteam.au`)"
