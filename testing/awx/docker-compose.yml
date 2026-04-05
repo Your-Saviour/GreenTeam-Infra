@@ -153,8 +153,9 @@ services:
         # Create writable receptor socket dir
         mkdir -p /tmp/receptor
 
-        # Start receptor in the background
-        /tmp/receptor-bin --config /etc/receptor/receptor.conf &
+        # Start receptor in the background (redirect stderr to prevent
+        # receptor warnings from polluting ansible-runner's worker stream)
+        /tmp/receptor-bin --config /etc/receptor/receptor.conf 2>/tmp/receptor.log &
         for i in $(seq 1 30); do
           [ -S /tmp/receptor/receptor.sock ] && break
           sleep 1
