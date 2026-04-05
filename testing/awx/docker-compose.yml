@@ -129,8 +129,7 @@ services:
         # Install receptor binary from init container
         cp /shared/receptor /tmp/receptor-bin && chmod +x /tmp/receptor-bin
 
-        # Symlink docker as podman — AWX hardcodes podman for process isolation
-        ln -sf /usr/local/bin/docker /usr/local/bin/podman 2>/dev/null || true
+        # Docker CLI is bind-mounted as /usr/bin/podman (AWX hardcodes podman for jobs)
 
         # Create writable receptor socket dir
         mkdir -p /tmp/receptor
@@ -177,7 +176,7 @@ services:
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/receptor.conf:/etc/receptor/receptor.conf:ro
       - /var/run/docker.sock:/var/run/docker.sock
-      - /usr/bin/docker:/usr/local/bin/docker:ro
+      - /usr/bin/docker:/usr/bin/podman:ro
     depends_on:
       awx-receptor-init:
         condition: service_completed_successfully
