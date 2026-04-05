@@ -58,7 +58,6 @@ services:
     volumes:
       - puppet_server_code:/etc/puppetlabs/code
       - puppet_server_config:/etc/puppetlabs/puppet
-      - puppet_server_ssl:/etc/puppetlabs/puppet/ssl
       - puppet_server_data:/opt/puppetlabs/server/data/puppetserver
     networks:
       - puppet-internal
@@ -145,7 +144,6 @@ volumes:
   puppet_postgres_data:
   puppet_server_code:
   puppet_server_config:
-  puppet_server_ssl:
   puppet_server_data:
   puppet_puppetdb_ssl:
   puppet_agent_ssl:
