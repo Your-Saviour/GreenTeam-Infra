@@ -1,4 +1,4 @@
-# Elastic Stack 8.17 Testing Stack (Elasticsearch 3-node + Logstash + Kibana + Fleet Server)
+# Elastic Stack 9.x Testing Stack (Elasticsearch 3-node + Logstash + Kibana + Fleet Server)
 # Deployed via Dockhand — not directly on the host OS.
 #
 # Prerequisites:
@@ -226,6 +226,9 @@ services:
     environment:
       - KIBANA_SYSTEM_PASSWORD=${KIBANA_SYSTEM_PASSWORD}
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - KIBANA_ENCRYPTION_KEY=${KIBANA_ENCRYPTION_KEY}
+      - KIBANA_SECURITY_KEY=${KIBANA_SECURITY_KEY}
+      - KIBANA_REPORTING_KEY=${KIBANA_REPORTING_KEY}
     volumes:
       - ./config/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
     healthcheck:
