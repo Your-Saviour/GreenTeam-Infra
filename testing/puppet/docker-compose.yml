@@ -38,7 +38,7 @@ services:
 
   # ─── Puppet Server (CA + Catalog Compiler) ──────────────────────────────────
   puppetserver:
-    image: puppet/puppetserver:${PUPPET_VERSION:-8}
+    image: puppet/puppetserver:latest
     container_name: puppet-server
     hostname: puppet
     restart: unless-stopped
@@ -65,7 +65,7 @@ services:
 
   # ─── PuppetDB (Fact/Catalog/Report Storage) ─────────────────────────────────
   puppetdb:
-    image: puppet/puppetdb:${PUPPET_VERSION:-8}
+    image: puppet/puppetdb:latest
     container_name: puppet-puppetdb
     restart: unless-stopped
     depends_on:
@@ -119,7 +119,7 @@ services:
 
   # ─── Puppet Agent (Test Node) ───────────────────────────────────────────────
   agent:
-    image: puppet/puppet-agent-ubuntu:${PUPPET_VERSION:-8}
+    image: puppet/puppet-agent-ubuntu:latest
     container_name: puppet-agent
     hostname: puppet-agent-test
     restart: unless-stopped
