@@ -121,6 +121,8 @@ services:
     image: quay.io/ansible/awx:24.6.1
     container_name: awx-task
     hostname: awxtask
+    group_add:
+      - "988"
     restart: unless-stopped
     command:
       - bash
