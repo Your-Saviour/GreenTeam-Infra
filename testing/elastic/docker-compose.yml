@@ -1,0 +1,304 @@
+# Elastic Stack 8.17 Testing Stack (Elasticsearch 3-node + Logstash + Kibana + Fleet Server)
+# Deployed via Dockhand — not directly on the host OS.
+#
+# Prerequisites:
+#   1. Copy .env.example to .env and generate passwords per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#
+# Host requirement (must be set on the OS before deploying via Dockhand):
+#   vm.max_map_count=262144
+#   Temporary: sudo sysctl -w vm.max_map_count=262144
+#   Permanent: add "vm.max_map_count=262144" to /etc/sysctl.conf
+#
+# Resource requirements: ~4GB RAM minimum (3x ES 512MB + Kibana + Logstash + Fleet)
+#
+# Notes:
+#   - Fleet Server auto-creates its policy on first enrollment with Kibana
+#   - Transport TLS is enabled between ES nodes; HTTP layer is plain (Traefik handles external HTTPS)
+#   - Logstash exposes 5044 (Beats) and 5514 (syslog) to host for external log sources
+
+services:
+
+  # ─── Init: generate certs and set passwords ───────────────────────────────
+  setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elastic-setup
+    restart: "no"
+    user: "0"
+    volumes:
+      - elastic-certs:/usr/share/elasticsearch/config/certs
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - KIBANA_SYSTEM_PASSWORD=${KIBANA_SYSTEM_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f config/certs/.certs_ready ]"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - elastic-internal
+    command: >
+      bash -c '
+        # Phase 1: Generate certificates
+        if [ ! -f config/certs/ca/ca.crt ]; then
+          echo "Generating CA...";
+          bin/elasticsearch-certutil ca --silent --pem -out /tmp/elastic-stack-ca.zip;
+          unzip /tmp/elastic-stack-ca.zip -d config/certs;
+        fi;
+
+        if [ ! -f config/certs/es01/es01.crt ]; then
+          echo "Generating node certificates...";
+          cat > /tmp/instances.yml << INNEREOF
+        instances:
+          - name: es01
+            dns: [es01, localhost]
+            ip: [127.0.0.1]
+          - name: es02
+            dns: [es02, localhost]
+            ip: [127.0.0.1]
+          - name: es03
+            dns: [es03, localhost]
+            ip: [127.0.0.1]
+      INNEREOF
+          bin/elasticsearch-certutil cert --silent --pem \
+            --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key \
+            --in /tmp/instances.yml -out /tmp/certs.zip;
+          unzip /tmp/certs.zip -d config/certs;
+        fi;
+
+        chown -R 1000:0 config/certs;
+        touch config/certs/.certs_ready;
+        echo "Certificates ready — ES nodes can start.";
+
+        # Phase 2: Wait for ES and set passwords
+        echo "Waiting for Elasticsearch to be ready...";
+        until curl -s -u "elastic:$${ELASTIC_PASSWORD}" http://es01:9200 | grep -q "cluster_name"; do
+          sleep 5;
+        done;
+
+        echo "Setting kibana_system password...";
+        curl -s -X POST -u "elastic:$${ELASTIC_PASSWORD}" \
+          -H "Content-Type: application/json" \
+          http://es01:9200/_security/user/kibana_system/_password \
+          -d "{\"password\":\"$${KIBANA_SYSTEM_PASSWORD}\"}";
+
+        echo "";
+        echo "Setup complete!";
+        touch config/certs/.setup_complete;
+      '
+
+  # ─── Elasticsearch cluster ────────────────────────────────────────────────
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elastic-es01
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_healthy
+    environment:
+      - node.name=es01
+      - cluster.name=${CLUSTER_NAME}
+      - discovery.seed_hosts=es02,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/es01/es01.key
+      - xpack.security.transport.ssl.certificate=certs/es01/es01.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.security.http.ssl.enabled=false
+      - xpack.license.self_generated.type=basic
+      - "ES_JAVA_OPTS=${ES_JAVA_OPTS}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elastic-certs:/usr/share/elasticsearch/config/certs:ro
+      - es01-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - elastic-internal
+
+  es02:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elastic-es02
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_healthy
+    environment:
+      - node.name=es02
+      - cluster.name=${CLUSTER_NAME}
+      - discovery.seed_hosts=es01,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/es02/es02.key
+      - xpack.security.transport.ssl.certificate=certs/es02/es02.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.security.http.ssl.enabled=false
+      - xpack.license.self_generated.type=basic
+      - "ES_JAVA_OPTS=${ES_JAVA_OPTS}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elastic-certs:/usr/share/elasticsearch/config/certs:ro
+      - es02-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - elastic-internal
+
+  es03:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: elastic-es03
+    restart: unless-stopped
+    depends_on:
+      setup:
+        condition: service_healthy
+    environment:
+      - node.name=es03
+      - cluster.name=${CLUSTER_NAME}
+      - discovery.seed_hosts=es01,es02
+      - cluster.initial_master_nodes=es01,es02,es03
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - bootstrap.memory_lock=true
+      - xpack.security.enabled=true
+      - xpack.security.transport.ssl.enabled=true
+      - xpack.security.transport.ssl.key=certs/es03/es03.key
+      - xpack.security.transport.ssl.certificate=certs/es03/es03.crt
+      - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+      - xpack.security.transport.ssl.verification_mode=certificate
+      - xpack.security.http.ssl.enabled=false
+      - xpack.license.self_generated.type=basic
+      - "ES_JAVA_OPTS=${ES_JAVA_OPTS}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elastic-certs:/usr/share/elasticsearch/config/certs:ro
+      - es03-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:$${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks:
+      - elastic-internal
+
+  # ─── Kibana ───────────────────────────────────────────────────────────────
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+    container_name: elastic-kibana
+    restart: unless-stopped
+    depends_on:
+      es01:
+        condition: service_healthy
+      es02:
+        condition: service_healthy
+      es03:
+        condition: service_healthy
+    environment:
+      - KIBANA_SYSTEM_PASSWORD=${KIBANA_SYSTEM_PASSWORD}
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    volumes:
+      - ./config/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:5601/api/status | grep -q '200'"]
+      interval: 30s
+      timeout: 10s
+      retries: 15
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.elastic-kibana.rule=Host(`elastic.testing.blueteam.au`)"
+      - "traefik.http.routers.elastic-kibana.entrypoints=websecure"
+      - "traefik.http.routers.elastic-kibana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.elastic-kibana.loadbalancer.server.port=5601"
+    networks:
+      - elastic-internal
+      - testing-proxy
+
+  # ─── Logstash ─────────────────────────────────────────────────────────────
+  logstash:
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    container_name: elastic-logstash
+    restart: unless-stopped
+    depends_on:
+      es01:
+        condition: service_healthy
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - "LS_JAVA_OPTS=${LS_JAVA_OPTS}"
+    volumes:
+      - ./config/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./config/logstash/pipeline/main.conf:/usr/share/logstash/pipeline/main.conf:ro
+    ports:
+      - "5044:5044"
+      - "5514:5514/tcp"
+      - "5514:5514/udp"
+    networks:
+      - elastic-internal
+
+  # ─── Fleet Server ─────────────────────────────────────────────────────────
+  fleet-server:
+    image: docker.elastic.co/beats/elastic-agent:${STACK_VERSION}
+    container_name: elastic-fleet-server
+    restart: unless-stopped
+    depends_on:
+      kibana:
+        condition: service_healthy
+    environment:
+      - FLEET_SERVER_ENABLE=true
+      - FLEET_SERVER_POLICY_ID=fleet-server-policy
+      - FLEET_SERVER_ELASTICSEARCH_HOST=http://es01:9200
+      - FLEET_SERVER_ELASTICSEARCH_USERNAME=elastic
+      - FLEET_SERVER_ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD}
+      - KIBANA_HOST=http://kibana:5601
+      - FLEET_URL=https://fleet.testing.blueteam.au
+      - FLEET_SERVER_INSECURE_HTTP=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.elastic-fleet.rule=Host(`fleet.testing.blueteam.au`)"
+      - "traefik.http.routers.elastic-fleet.entrypoints=websecure"
+      - "traefik.http.routers.elastic-fleet.tls.certresolver=letsencrypt"
+      - "traefik.http.services.elastic-fleet.loadbalancer.server.port=8220"
+    networks:
+      - elastic-internal
+      - testing-proxy
+
+networks:
+  elastic-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  elastic-certs:
+  es01-data:
+  es02-data:
+  es03-data:
