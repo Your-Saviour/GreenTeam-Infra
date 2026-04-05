@@ -22,8 +22,10 @@ services:
     restart: "no"
     volumes:
       - guacamole_initdb_scripts:/initdb
-    entrypoint: >-
-      sh -c "/opt/guacamole/bin/initdb.sh --postgresql > /initdb/001-schema.sql"
+    entrypoint:
+      - sh
+      - -c
+      - "/opt/guacamole/bin/initdb.sh --postgresql > /initdb/001-schema.sql"
 
   # ─── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
