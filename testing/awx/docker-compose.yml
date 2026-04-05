@@ -196,6 +196,7 @@ services:
       - ./config/settings.py:/etc/tower/settings.py:ro
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/receptor.conf:/etc/receptor/receptor.conf:ro
+      - ./config/ansible-runner-wrapper.sh:/tmp/ansible-runner-wrapper.sh:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /usr/bin/docker:/usr/bin/podman:ro
     depends_on:
