@@ -62,6 +62,7 @@ services:
       - puppet_server_data:/opt/puppetlabs/server/data/puppetserver
     networks:
       - puppet-internal
+      - testing-proxy
 
   # ─── PuppetDB (Fact/Catalog/Report Storage) ─────────────────────────────────
   puppetdb:
