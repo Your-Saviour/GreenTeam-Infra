@@ -1,0 +1,105 @@
+# Activepieces Testing Stack (App + Worker + PostgreSQL + Redis)
+# Prerequisites:
+#   1. Copy .env.example to .env and generate secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Start: docker compose up -d
+#
+# Resource requirements: ~1GB RAM minimum (app + 2 workers + postgres + redis)
+#
+# Notes:
+#   - App and Worker use the same image, differentiated by AP_CONTAINER_TYPE
+#   - Both share a cache volume at /usr/src/app/cache
+#   - Only the app container is exposed via Traefik; workers are internal only
+
+services:
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: activepieces-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - activepieces_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${AP_POSTGRES_DATABASE:-activepieces}
+      POSTGRES_USER: ${AP_POSTGRES_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${AP_POSTGRES_PASSWORD:?Please set AP_POSTGRES_PASSWORD in your .env file}
+    networks:
+      - activepieces-internal
+
+  # ─── Redis ───────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: activepieces-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - activepieces_redis_data:/data
+    networks:
+      - activepieces-internal
+
+  # ─── App (API + Frontend) ────────────────────────────────────────────────────
+  app:
+    image: ghcr.io/activepieces/activepieces:latest
+    container_name: activepieces-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AP_CONTAINER_TYPE: APP
+      AP_FRONTEND_URL: https://activepieces.testing.blueteam.au
+    volumes:
+      - activepieces_cache:/usr/src/app/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.activepieces.rule=Host(`activepieces.testing.blueteam.au`)"
+      - "traefik.http.routers.activepieces.entrypoints=websecure"
+      - "traefik.http.routers.activepieces.tls.certresolver=letsencrypt"
+      - "traefik.http.services.activepieces.loadbalancer.server.port=80"
+    networks:
+      - activepieces-internal
+      - testing-proxy
+
+  # ─── Worker (Flow Execution) ─────────────────────────────────────────────────
+  worker:
+    image: ghcr.io/activepieces/activepieces:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AP_CONTAINER_TYPE: WORKER
+    volumes:
+      - activepieces_cache:/usr/src/app/cache
+    deploy:
+      replicas: 2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - activepieces-internal
+
+networks:
+  activepieces-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  activepieces_postgres_data:
+  activepieces_redis_data:
+  activepieces_cache:
