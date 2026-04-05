@@ -97,7 +97,9 @@ DEFAULT_CONTROL_PLANE_QUEUE_NAME = 'controlplane'
 # ── Job Isolation ───────────────────────────────────────────────────────────
 # Disable process isolation (no podman/docker available inside the container).
 # Jobs run directly inside awx-task via ansible-runner.
-AWX_ISOLATION_BASE_PATH = '/tmp'
+# Must be a host-accessible path since EE containers are launched on the host
+# via the Docker socket, not inside this container.
+AWX_ISOLATION_BASE_PATH = '/var/lib/awx/job_tmp'
 AWX_ISOLATION_SHOW_PATHS = [
     '/var/lib/awx/projects',
 ]
