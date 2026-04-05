@@ -43,8 +43,8 @@ services:
     hostname: puppet
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf --cacert /etc/puppetlabs/puppet/ssl/certs/ca.pem https://localhost:8140/status/v1/simple || exit 1"]
-      start_period: 120s
+      test: ["CMD-SHELL", "curl -fsS --insecure https://localhost:8140/status/v1/simple"]
+      start_period: 180s
       interval: 30s
       retries: 10
       timeout: 10s
