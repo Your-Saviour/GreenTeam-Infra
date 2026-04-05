@@ -53,7 +53,6 @@ services:
       PUPPETSERVER_HOSTNAME: puppet
       PUPPET_CERTNAME: puppet
       AUTOSIGN: "true"
-      CA_ENABLED: "true"
       PUPPETSERVER_JAVA_ARGS: ${PUPPETSERVER_JAVA_ARGS:--Xms512m -Xmx512m}
       DNS_ALT_NAMES: "puppet,puppet-server,puppetserver"
     volumes:
