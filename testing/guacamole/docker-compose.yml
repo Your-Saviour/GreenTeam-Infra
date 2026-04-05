@@ -13,11 +13,26 @@
 
 services:
 
+  # ─── Database Init (one-shot) ────────────────────────────────────────────────
+  # Generates the Guacamole schema SQL into a shared volume. Postgres picks it
+  # up automatically from /docker-entrypoint-initdb.d/ on first start.
+  initdb:
+    image: guacamole/guacamole:latest
+    container_name: guacamole-initdb
+    restart: "no"
+    volumes:
+      - guacamole_initdb_scripts:/initdb
+    entrypoint: >-
+      sh -c "/opt/guacamole/bin/initdb.sh --postgresql > /initdb/001-schema.sql"
+
   # ─── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: guacamole-postgres
     restart: unless-stopped
+    depends_on:
+      initdb:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       start_period: 15s
@@ -26,32 +41,11 @@ services:
       timeout: 5s
     volumes:
       - guacamole_postgres_data:/var/lib/postgresql/data
+      - guacamole_initdb_scripts:/docker-entrypoint-initdb.d:ro
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-guacamole}
       POSTGRES_USER: ${POSTGRES_USER:-guacamole}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
-    networks:
-      - guacamole-internal
-
-  # ─── Database Init (one-shot) ────────────────────────────────────────────────
-  initdb:
-    image: guacamole/guacamole:latest
-    container_name: guacamole-initdb
-    restart: "no"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      POSTGRES_HOSTNAME: postgres
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: ${POSTGRES_DB:-guacamole}
-      POSTGRES_USER: ${POSTGRES_USER:-guacamole}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
-    entrypoint: >-
-      sh -c "
-      /opt/guacamole/bin/initdb.sh --postgresql > /tmp/initdb.sql &&
-      PGPASSWORD=$$POSTGRES_PASSWORD psql -h postgres -U $$POSTGRES_USER -d $$POSTGRES_DB -f /tmp/initdb.sql
-      "
     networks:
       - guacamole-internal
 
@@ -71,8 +65,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      initdb:
-        condition: service_completed_successfully
       guacd:
         condition: service_started
     environment:
@@ -100,3 +92,4 @@ networks:
 
 volumes:
   guacamole_postgres_data:
+  guacamole_initdb_scripts:
