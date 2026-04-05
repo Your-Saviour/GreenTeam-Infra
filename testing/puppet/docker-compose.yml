@@ -1,0 +1,150 @@
+# Puppet Testing Stack (Puppet Server + PuppetDB + Puppetboard + PostgreSQL)
+# Prerequisites:
+#   1. Copy .env.example to .env and generate secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Start: docker compose up -d
+#
+# Resource requirements: ~2GB RAM minimum (Puppet Server ~512MB JVM + PuppetDB ~256MB + PostgreSQL + Puppetboard)
+#
+# Notes:
+#   - Puppet Server generates its own CA on first start (takes 1-2 minutes)
+#   - Autosign is enabled so PuppetDB and agents get certificates automatically
+#   - Puppetboard is available at puppet.testing.blueteam.au
+#   - PuppetDB stores facts, catalogs, and reports from Puppet runs
+#   - The puppet-agent container runs a single test agent
+#   - First startup is slow (~3-5 min) while Puppet Server generates the CA
+
+services:
+
+  # ─── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: puppet-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - puppet_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-puppetdb}
+      POSTGRES_USER: ${POSTGRES_USER:-puppetdb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+    networks:
+      - puppet-internal
+
+  # ─── Puppet Server (CA + Catalog Compiler) ──────────────────────────────────
+  puppetserver:
+    image: puppet/puppetserver:${PUPPET_VERSION:-8}
+    container_name: puppet-server
+    hostname: puppet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf --cacert /etc/puppetlabs/puppet/ssl/certs/ca.pem https://localhost:8140/status/v1/simple || exit 1"]
+      start_period: 120s
+      interval: 30s
+      retries: 10
+      timeout: 10s
+    environment:
+      PUPPETSERVER_HOSTNAME: puppet
+      PUPPET_CERTNAME: puppet
+      AUTOSIGN: "true"
+      CA_ENABLED: "true"
+      PUPPETSERVER_JAVA_ARGS: ${PUPPETSERVER_JAVA_ARGS:--Xms512m -Xmx512m}
+      DNS_ALT_NAMES: "puppet,puppet-server,puppetserver"
+    volumes:
+      - puppet_server_code:/etc/puppetlabs/code
+      - puppet_server_config:/etc/puppetlabs/puppet
+      - puppet_server_ssl:/etc/puppetlabs/puppet/ssl
+      - puppet_server_data:/opt/puppetlabs/server/data/puppetserver
+    networks:
+      - puppet-internal
+
+  # ─── PuppetDB (Fact/Catalog/Report Storage) ─────────────────────────────────
+  puppetdb:
+    image: puppet/puppetdb:${PUPPET_VERSION:-8}
+    container_name: puppet-puppetdb
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      puppetserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/status/v1/services/puppetdb-status || exit 1"]
+      start_period: 60s
+      interval: 30s
+      retries: 10
+      timeout: 10s
+    environment:
+      PUPPETSERVER_HOSTNAME: puppet
+      PUPPET_CERTNAME: puppetdb
+      PUPPETDB_POSTGRES_HOSTNAME: postgres
+      PUPPETDB_POSTGRES_PORT: "5432"
+      PUPPETDB_POSTGRES_DATABASE: ${POSTGRES_DB:-puppetdb}
+      PUPPETDB_USER: ${POSTGRES_USER:-puppetdb}
+      PUPPETDB_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+      PUPPETDB_JAVA_ARGS: ${PUPPETDB_JAVA_ARGS:--Xms256m -Xmx256m}
+    volumes:
+      - puppet_puppetdb_ssl:/etc/puppetlabs/puppet/ssl
+    networks:
+      - puppet-internal
+
+  # ─── Puppetboard (Web UI for PuppetDB) ──────────────────────────────────────
+  puppetboard:
+    image: ghcr.io/voxpupuli/puppetboard:latest
+    container_name: puppet-board
+    restart: unless-stopped
+    depends_on:
+      puppetdb:
+        condition: service_healthy
+    environment:
+      PUPPETDB_HOST: puppetdb
+      PUPPETDB_PORT: "8080"
+      ENABLE_CATALOG: "true"
+      ENABLE_QUERY: "true"
+      DEFAULT_ENVIRONMENT: production
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.puppet-board.rule=Host(`puppet.testing.blueteam.au`)"
+      - "traefik.http.routers.puppet-board.entrypoints=websecure"
+      - "traefik.http.routers.puppet-board.tls.certresolver=letsencrypt"
+      - "traefik.http.services.puppet-board.loadbalancer.server.port=8000"
+    networks:
+      - puppet-internal
+      - testing-proxy
+
+  # ─── Puppet Agent (Test Node) ───────────────────────────────────────────────
+  agent:
+    image: puppet/puppet-agent-ubuntu:${PUPPET_VERSION:-8}
+    container_name: puppet-agent
+    hostname: puppet-agent-test
+    restart: unless-stopped
+    depends_on:
+      puppetserver:
+        condition: service_healthy
+    environment:
+      PUPPET_CERTNAME: puppet-agent-test
+      PUPPET_MASTERHOST: puppet
+    volumes:
+      - puppet_agent_ssl:/etc/puppetlabs/puppet/ssl
+    networks:
+      - puppet-internal
+
+networks:
+  puppet-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  puppet_postgres_data:
+  puppet_server_code:
+  puppet_server_config:
+  puppet_server_ssl:
+  puppet_server_data:
+  puppet_puppetdb_ssl:
+  puppet_agent_ssl:
