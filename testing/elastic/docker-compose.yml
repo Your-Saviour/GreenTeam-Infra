@@ -126,8 +126,15 @@ services:
       interval: 30s
       timeout: 10s
       retries: 10
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.elastic-es.rule=Host(`es.testing.blueteam.au`)"
+      - "traefik.http.routers.elastic-es.entrypoints=websecure"
+      - "traefik.http.routers.elastic-es.tls.certresolver=letsencrypt"
+      - "traefik.http.services.elastic-es.loadbalancer.server.port=9200"
     networks:
       - elastic-internal
+      - testing-proxy
 
   es02:
     image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
