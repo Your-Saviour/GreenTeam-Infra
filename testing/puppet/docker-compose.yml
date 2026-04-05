@@ -60,6 +60,7 @@ services:
       DNS_ALT_NAMES: "puppet,puppet-server,puppetserver,puppet.testing.blueteam.au"
     volumes:
       - ./config/80-ca.sh:/docker-entrypoint.d/80-ca.sh:ro
+      - ./config/85-configure-puppetdb.sh:/docker-entrypoint.d/85-configure-puppetdb.sh:ro
       - ./config/90-install-modules.sh:/docker-entrypoint.d/90-install-modules.sh:ro
       - ./code/environments/production:/etc/puppetlabs/code/environments/production
       - puppet_server_config:/etc/puppetlabs/puppet
