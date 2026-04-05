@@ -117,3 +117,16 @@ CSRF_TRUSTED_ORIGINS = [
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SOCIAL_AUTH_REDIRECT_IS_HTTPS = True
+
+# ── Monkey-patch ────────────────────────────────────────────────────────────
+# Fix ansible-runner streaming to handle empty EOF lines from receptor.
+# Without this, jobs show as 'error' even when the playbook succeeds.
+import importlib.util
+import sys
+_spec = importlib.util.spec_from_file_location('streaming_patch', '/etc/tower/streaming_patch.py')
+if _spec and _spec.loader:
+    _mod = importlib.util.module_from_spec(_spec)
+    try:
+        _spec.loader.exec_module(_mod)
+    except Exception:
+        pass  # Don't break startup if patch fails

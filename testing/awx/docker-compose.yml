@@ -66,6 +66,7 @@ services:
       DJANGO_SUPERUSER_PASSWORD: ${AWX_ADMIN_PASSWORD}
     volumes:
       - ./config/settings.py:/etc/tower/settings.py:ro
+      - ./config/streaming_patch.py:/etc/tower/streaming_patch.py:ro
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       postgres:
@@ -94,6 +95,7 @@ services:
     volumes:
       - /var/lib/awx/projects:/var/lib/awx/projects
       - ./config/settings.py:/etc/tower/settings.py:ro
+      - ./config/streaming_patch.py:/etc/tower/streaming_patch.py:ro
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       awx-init:
@@ -194,6 +196,7 @@ services:
       - /var/lib/awx/job_tmp:/var/lib/awx/job_tmp
       - awx-receptor-bin:/shared:ro
       - ./config/settings.py:/etc/tower/settings.py:ro
+      - ./config/streaming_patch.py:/etc/tower/streaming_patch.py:ro
       - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/receptor.conf:/etc/receptor/receptor.conf:ro
       - ./config/ansible-runner-wrapper.sh:/tmp/ansible-runner-wrapper.sh:ro
