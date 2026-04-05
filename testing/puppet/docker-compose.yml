@@ -11,7 +11,6 @@
 #   - Autosign is enabled so PuppetDB and agents get certificates automatically
 #   - Puppetboard is available at puppet.testing.blueteam.au
 #   - PuppetDB stores facts, catalogs, and reports from Puppet runs
-#   - The puppet-agent container runs a single test agent
 #   - First startup is slow (~3-5 min) while Puppet Server generates the CA
 
 services:
@@ -117,22 +116,6 @@ services:
       - puppet-internal
       - testing-proxy
 
-  # ─── Puppet Agent (Test Node) ───────────────────────────────────────────────
-  agent:
-    image: puppet/puppet-agent-ubuntu:latest
-    container_name: puppet-agent
-    hostname: puppet-agent-test
-    restart: unless-stopped
-    depends_on:
-      puppetserver:
-        condition: service_healthy
-    environment:
-      PUPPET_CERTNAME: puppet-agent-test
-      PUPPET_MASTERHOST: puppet
-    volumes:
-      - puppet_agent_ssl:/etc/puppetlabs/puppet/ssl
-    networks:
-      - puppet-internal
 
 networks:
   puppet-internal:
@@ -146,4 +129,3 @@ volumes:
   puppet_server_config:
   puppet_server_data:
   puppet_puppetdb_ssl:
-  puppet_agent_ssl:
