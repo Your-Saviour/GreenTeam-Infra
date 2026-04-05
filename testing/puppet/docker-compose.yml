@@ -56,6 +56,7 @@ services:
       PUPPETSERVER_JAVA_ARGS: ${PUPPETSERVER_JAVA_ARGS:--Xms512m -Xmx512m}
       DNS_ALT_NAMES: "puppet,puppet-server,puppetserver,puppet.testing.blueteam.au"
     volumes:
+      - ./config/80-ca.sh:/docker-entrypoint.d/80-ca.sh:ro
       - ./code/environments/production:/etc/puppetlabs/code/environments/production:ro
       - puppet_server_config:/etc/puppetlabs/puppet
       - puppet_server_data:/opt/puppetlabs/server/data/puppetserver
