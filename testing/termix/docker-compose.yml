@@ -1,0 +1,54 @@
+# Termix Testing Stack (Termix + Guacamole)
+# Prerequisites:
+#   1. Copy .env.example to .env and generate secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Start: docker compose up -d
+#
+# Resource requirements: ~512MB RAM minimum (Termix + Guacamole daemon)
+#
+# Notes:
+#   - Termix uses an embedded encrypted SQLite database — no external DB required
+#   - Guacamole daemon (guacd) provides RDP, VNC, and Telnet remote desktop support
+#   - First login requires creating an administrator account
+#   - All settings and credentials are persisted in the termix_data volume
+
+services:
+
+  # ─── Guacamole Daemon (Remote Desktop) ──────────────────────────────────────
+  guacd:
+    image: guacamole/guacd:latest
+    container_name: termix-guacd
+    restart: unless-stopped
+    networks:
+      - termix-internal
+
+  # ─── Termix (SSH & Server Management) ───────────────────────────────────────
+  termix:
+    image: ghcr.io/lukegus/termix:latest
+    container_name: termix
+    restart: unless-stopped
+    depends_on:
+      - guacd
+    volumes:
+      - termix_data:/app/data
+    environment:
+      PORT: ${TERMIX_PORT:-8080}
+      SALT: ${TERMIX_SALT:?Please set TERMIX_SALT in your .env file}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.termix.rule=Host(`termix.testing.blueteam.au`)"
+      - "traefik.http.routers.termix.entrypoints=websecure"
+      - "traefik.http.routers.termix.tls.certresolver=letsencrypt"
+      - "traefik.http.services.termix.loadbalancer.server.port=8080"
+    networks:
+      - termix-internal
+      - testing-proxy
+
+networks:
+  termix-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  termix_data:
