@@ -6,14 +6,7 @@ Priority is based on weighted value (60% blue, 30% green, 10% red) balanced agai
 
 ## Tier 1 — Deploy First (High value, easy setup)
 
-- **CrowdSec** — Setup: 4/10 | Value: 8/10 | Priority Score: ★★★★★
-  Open-source, collaborative behavior detection engine that analyzes logs from multiple sources (web servers, SSH, databases, containers) to detect suspicious patterns and take active remediation. Leverages crowdsourced IP reputation data for collective defense. Decouples detection from remediation.
-  GitHub: https://github.com/crowdsecurity/crowdsec
-  Docs: https://docs.crowdsec.net/
-  Website: https://www.crowdsec.net/
-  Docker: `crowdsecurity/crowdsec` on Docker Hub
-  _Setup notes: CrowdSec engine is a single container. Production setup adds bouncers (e.g. Traefik bouncer plugin) for enforcement. Needs log volume mounts from other services. Well-documented Docker setup. Dashboard available via CrowdSec Console (cloud) or local API. Integrates well with existing Traefik setup._
-  _Value notes: Blue 9/10 — real-time threat detection, crowdsourced IP reputation, automated blocking. Green 7/10 — test detection rules against attack scenarios. Red 1/10. Plugs directly into existing Traefik via bouncer — one of the highest value:effort ratios on this list._
+- ~~**CrowdSec**~~ — **DEPLOYED** → `testing/crowdsec/`
 
 - **DFIR-IRIS** — Setup: 3/10 | Value: 8/10 | Priority Score: ★★★★★
   Open-source collaborative incident response platform for managing and analyzing security investigations. Provides case management, alert triage, timeline reconstruction, and forensic analysis with real-time collaboration. Extensible modules integrate with VirusTotal, MISP, and IntelOwl.
