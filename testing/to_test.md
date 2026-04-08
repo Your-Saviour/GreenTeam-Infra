@@ -21,12 +21,14 @@ Priority is based on weighted value (60% blue, 30% green, 10% red) balanced agai
   _Setup notes: Official docker-compose provided in repo (BloodHound CE). PostgreSQL + Neo4j + BloodHound containers. Web UI proxies cleanly through Traefik. Well-documented setup process._
   _Value notes: Blue 7/10 — identify AD privilege risks proactively, find misconfigs. Green 8/10 — validate AD attack paths, measure hardening. Red 9/10 — essential for AD attack planning. Dual-use tool with massive value on both sides — one of the best bang-for-buck tools on this list._
 
-- **Caldera** — Setup: 4/10 | Value: 8/10 | Priority Score: ★★★★★
+- ~~**Caldera**~~ — **DEPLOYED** → `testing/caldera/`
+
+  ~~Setup: 4/10 | Value: 8/10 | Priority Score: ★★★★★~~
   MITRE's automated adversary emulation platform built on the ATT&CK framework. Simulates real-world threats, tests network and host defenses, and automates red team operations through a C2 server with REST API and web interface. Supports plugins for custom agents, reporting, and TTPs.
   GitHub: https://github.com/mitre/caldera
   Docs: https://caldera.readthedocs.io/
   Website: https://caldera.mitre.org/
-  Docker: `mitre/caldera` on Docker Hub; docker-compose in repo
+  Docker: `ghcr.io/mitre/caldera` on GHCR; docker-compose in repo
   _Setup notes: Official Docker image and compose in repo. Mostly self-contained (embedded DB). Web UI on single port — clean Traefik integration. Agent communication ports need direct exposure. Plugin system may require volume mounts. Well-documented._
   _Value notes: Blue 7/10 — automated detection testing against ATT&CK. Green 10/10 — automated adversary emulation, runs Atomic Red Team tests. Red 7/10 — automated attack execution. MITRE-backed, integrates with Atomic Red Team — the automated purple team engine._
 

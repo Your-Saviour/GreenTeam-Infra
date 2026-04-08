@@ -52,3 +52,34 @@ Issues and improvements noted during stack deployments.
 - Traefik labels worked correctly — routing was confirmed by inspecting labels and testing via container IP.
 - The app responded on port 8080 with clean 301 redirect to `/ui` and functional API login.
 - 4GB VM was sufficient despite the 8GB recommendation — Neo4j + Postgres + app ran without OOM issues.
+
+---
+
+## Caldera (2026-04-09)
+
+### Issues encountered
+
+1. **Docker Hub image is abandoned.** The `mitre/caldera` image on Docker Hub is from July 2021 (Python 3.8, Caldera ~4.x). It appeared to start but never actually bound port 8888. The actively maintained image is `ghcr.io/mitre/caldera` on GitHub Container Registry (March 2025, Python 3.11, Caldera 5.2.0).
+
+   **Suggestion for design.md:** Add a note under "Prefer official images" — always verify Docker Hub images are actively maintained. Check the `Created` date with `docker image inspect --format '{{.Created}}'`. For MITRE projects, prefer GHCR (`ghcr.io/mitre/*`) over Docker Hub.
+
+2. **No curl/wget in container image.** The GHCR Caldera image doesn't include curl or wget. Healthchecks must use `python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8888')"` instead. This is a variant of the distroless healthcheck issue from BloodHound, but with Python available as a fallback.
+
+   **Suggestion for design.md:** Add Python urllib as a healthcheck pattern alongside curl and wget.
+
+3. **`local.yml` is the main config, not a merge overlay.** When Caldera is started with `conf/local.yml` present, it uses it as the **sole** config file — it does NOT merge with `default.yml`. Missing keys become `None` and cause startup errors (NoneType exceptions for contacts, requirements, etc.). The `local.yml` must contain ALL keys from `default.yml`.
+
+   **Suggestion for design.md or workflow.md:** Add a note about config file behaviour — "Check whether the tool merges config files or uses one as the sole source. If it replaces entirely, the config template must include ALL required keys, not just overrides."
+
+4. **Slow first start due to atomic plugin.** The `atomic` plugin downloads the full Atomic Red Team test repository on first start. This adds 30-60 seconds to initial startup and consumes significant CPU. The `start_period` for the healthcheck needs to account for this.
+
+5. **Deploy testing on the VM must use the actual `testing/docker-compose.yml` from the repo** — not a simplified stand-in. The core stack includes Dockhand, access logging, dashboard auth, and CrowdSec bouncer config. Deploying a stripped-down version defeats the purpose of integration testing.
+
+   **Update to workflow.md:** The "Deploy" section should explicitly state to use the real `testing/docker-compose.yml` and `testing/traefik/` configs, not write custom ones.
+
+### Things that worked well
+
+- Single-container architecture (no external DB) made the compose file simple.
+- Agent communication ports (TCP, UDP, WebSocket, SSH, FTP, DNS) published correctly alongside Traefik-proxied web UI.
+- API responded through Traefik with key-based auth — 29 adversaries and 1,838 abilities loaded from ATT&CK + Atomic Red Team.
+- 4GB VM was more than sufficient for a single-container stack.

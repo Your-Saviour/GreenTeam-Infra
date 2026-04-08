@@ -107,11 +107,11 @@ apt-get update && apt-get install -y docker.io docker-compose-v2
 
 ### Deploy
 
-1. **Copy files to the VM.** Mirror the repo structure under `/opt/testing/`:
+1. **Copy files to the VM.** Mirror the repo structure under `/opt/testing/`, using the **actual** `testing/docker-compose.yml` and `testing/traefik/` configs from the repo — do not write simplified stand-ins. The core stack includes Dockhand, access logging, dashboard auth, and CrowdSec bouncer config; deploying a stripped-down version defeats the purpose of integration testing.
    ```
    /opt/testing/
-   ├── docker-compose.yml        # Core stack
-   ├── traefik/                   # Traefik config
+   ├── docker-compose.yml        # Core stack (copy from testing/docker-compose.yml)
+   ├── traefik/                   # Traefik config (copy from testing/traefik/)
    ├── <tool>/                    # Your stack
    ```
 

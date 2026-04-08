@@ -1,0 +1,59 @@
+# MITRE Caldera Testing Stack
+# Prerequisites:
+#   1. Copy config/local.yml.example to config/local.yml and update secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Start: docker compose up -d
+#
+# Resource requirements: ~512MB RAM minimum
+#   - Caldera: ~512MB (Python app with embedded database, plugin loading on startup)
+#
+# Notes:
+#   - Default login: red / admin (change in config/local.yml before deploying)
+#   - Additional users: blue / admin (blue team), admin / admin (red team admin)
+#   - First start takes 1-2 minutes while plugins load and compile agents
+#   - Agent communication ports are published directly (cannot be reverse-proxied):
+#     7010/tcp (Sandcat TCP), 7011/udp (UDP), 7012/tcp (Manx WebSocket),
+#     8022/tcp (SSH tunnel), 2222/tcp (FTP), 8853/tcp (DNS)
+#   - Caldera is designed for isolated network testing — do NOT expose to the internet
+#   - API keys for automation: set api_key_red and api_key_blue in config/local.yml
+
+services:
+
+  # ─── Application ────────────────────────────────────────────────────────────
+  caldera:
+    image: ghcr.io/mitre/caldera:${CALDERA_TAG:-latest}
+    container_name: caldera-app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8888')\""]
+      start_period: 90s
+      interval: 30s
+      retries: 5
+      timeout: 10s
+    volumes:
+      - ./config/local.yml:/usr/src/app/conf/local.yml:ro
+      - caldera_data:/usr/src/app/data
+    ports:
+      # Agent communication ports — these protocols cannot be reverse-proxied through Traefik.
+      # Agents connect directly to the host on these ports for C2 communication.
+      - "7010:7010"       # TCP contact (Sandcat primary)
+      - "7011:7011/udp"   # UDP contact
+      - "7012:7012"       # WebSocket contact (Manx)
+      - "8022:8022"       # SSH tunnel contact
+      - "2222:2222"       # FTP contact
+      - "8853:8853"       # DNS contact
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.caldera.rule=Host(`caldera.testing.blueteam.au`)"
+      - "traefik.http.routers.caldera.entrypoints=websecure"
+      - "traefik.http.routers.caldera.tls.certresolver=letsencrypt"
+      - "traefik.http.services.caldera.loadbalancer.server.port=8888"
+    networks:
+      - testing-proxy
+
+networks:
+  testing-proxy:
+    external: true
+
+volumes:
+  caldera_data:
