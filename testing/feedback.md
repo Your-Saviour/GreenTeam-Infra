@@ -39,7 +39,7 @@ Issues and improvements noted during stack deployments.
 
 1. **Scratch/distroless container image — no shell.** The `specterops/bloodhound` image is built from scratch with only the Go binary (`/bloodhound`). There is no `/bin/sh`, no `curl`, no `wget`. This means `CMD-SHELL` healthchecks are impossible. The `/bloodhound` binary only supports `-configfile` and `-version` flags — no health subcommand. Had to remove the healthcheck entirely and document the limitation.
 
-   **Suggestion for design.md:** Add a note under Healthchecks — "If the container is scratch/distroless with no shell, CMD-SHELL healthchecks won't work. Check if the binary has a health subcommand. If not, document the limitation and rely on restart policy + Traefik routing for liveness."
+   **Suggestion for design.md:** Add a note under Healthchecks — "If the container is scratch/distroless with no shell, CMD-SHELL healthchecks won't work. Check if the binary has a health subcommand. If not, do NOT define a healthcheck at all — Traefik's Docker provider filters out containers with 'starting' or 'unhealthy' health status, so a broken healthcheck prevents routing entirely. Omit the healthcheck and rely on restart policy + Traefik routing for liveness."
 
 2. **No `/api/health` endpoint.** The obvious healthcheck URL doesn't exist. The closest alternative is `/api/version` which returns 401 (Unauthorized) when the API is up — confirms liveness but requires no auth. This would work if the container had a shell to run curl/wget.
 
