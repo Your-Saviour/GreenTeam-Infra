@@ -128,6 +128,14 @@ apt-get update && apt-get install -y docker.io docker-compose-v2
    cd /opt/testing/<tool> && docker compose up -d
    ```
 
+5. **Change the Traefik hostname for this VM.** The compose files use `*.testing.blueteam.au` hostnames, but throwaway VMs don't have DNS records for those subdomains. Before testing through Traefik, update the Host rule in the tool's compose file on the VM to use the CloudLab hostname:
+   ```bash
+   cd /opt/testing/<tool>
+   sed -i 's/<tool>.testing.blueteam.au/<vm-hostname>.ye-et.com/g' docker-compose.yml
+   docker compose up -d --force-recreate
+   ```
+   This makes the service accessible at `https://<vm-hostname>.ye-et.com` (accept the self-signed cert warning). Don't copy this change back to the local files — the repo should keep the `*.testing.blueteam.au` hostnames.
+
 ### Validate
 
 Run through this checklist on the VM:
