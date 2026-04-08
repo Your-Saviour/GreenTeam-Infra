@@ -30,3 +30,25 @@ Issues and improvements noted during stack deployments.
 - The `.env.example` pattern with `${VAR:?error}` caught missing secrets immediately on startup.
 - The `depends_on` + `condition: service_healthy` chain (postgres → app → worker) ensured clean startup ordering.
 - Skipping the upstream nginx container in favour of Traefik was a clean simplification with no issues.
+
+---
+
+## BloodHound CE (2026-04-08)
+
+### Issues encountered
+
+1. **Scratch/distroless container image — no shell.** The `specterops/bloodhound` image is built from scratch with only the Go binary (`/bloodhound`). There is no `/bin/sh`, no `curl`, no `wget`. This means `CMD-SHELL` healthchecks are impossible. The `/bloodhound` binary only supports `-configfile` and `-version` flags — no health subcommand. Had to remove the healthcheck entirely and document the limitation.
+
+   **Suggestion for design.md:** Add a note under Healthchecks — "If the container is scratch/distroless with no shell, CMD-SHELL healthchecks won't work. Check if the binary has a health subcommand. If not, document the limitation and rely on restart policy + Traefik routing for liveness."
+
+2. **No `/api/health` endpoint.** The obvious healthcheck URL doesn't exist. The closest alternative is `/api/version` which returns 401 (Unauthorized) when the API is up — confirms liveness but requires no auth. This would work if the container had a shell to run curl/wget.
+
+3. **Initial admin password only shown on first start.** The randomly generated password is printed to stdout only when the database is first initialised. If the postgres volume persists across container recreations, the password won't appear in logs again. Use `docker compose exec bloodhound ./bloodhound-cli resetpwd` to reset it — but note this also requires the container to have been started at least once.
+
+### Things that worked well
+
+- The three-container architecture (Postgres + Neo4j + app) started cleanly with `depends_on` + `service_healthy` on both databases.
+- Neo4j 4.4 healthcheck via `wget` on port 7474 worked reliably.
+- Traefik labels worked correctly — routing was confirmed by inspecting labels and testing via container IP.
+- The app responded on port 8080 with clean 301 redirect to `/ui` and functional API login.
+- 4GB VM was sufficient despite the 8GB recommendation — Neo4j + Postgres + app ran without OOM issues.

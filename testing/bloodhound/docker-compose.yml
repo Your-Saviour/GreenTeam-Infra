@@ -1,0 +1,105 @@
+# BloodHound Community Edition Testing Stack
+# Prerequisites:
+#   1. Copy .env.example to .env and generate secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Start: docker compose up -d
+#
+# Resource requirements: ~4GB RAM minimum
+#   - PostgreSQL: ~128MB
+#   - Neo4j: ~1.5GB (graph database, JVM-based)
+#   - BloodHound app: ~512MB (API server + graph analysis on startup)
+#
+# Notes:
+#   - First start generates a random admin password — check logs:
+#     docker compose logs bloodhound 2>&1 | grep "Initial Password"
+#   - Default admin user: admin (email: spam@example.com)
+#   - Graph analysis runs on startup (~1 minute) — avoid heavy API calls during this period
+#   - Sessions are ephemeral (new JWT signing key per restart) — users must re-login after restart
+#   - BloodHound image is scratch/distroless (no shell) — healthcheck not possible via CMD-SHELL
+#     Liveness is confirmed by Traefik routing and depends_on for startup ordering
+
+services:
+
+  # ─── Database ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: bloodhound-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - bloodhound_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bloodhound}
+      POSTGRES_USER: ${POSTGRES_USER:-bloodhound}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+    networks:
+      - bloodhound-internal
+
+  # ─── Graph Database ────────────────────────────────────────────────────────
+  neo4j:
+    image: neo4j:4.4
+    container_name: bloodhound-neo4j
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null -q http://localhost:7474 || exit 1"]
+      start_period: 30s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - bloodhound_neo4j_data:/data
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?Please set NEO4J_PASSWORD in your .env file}
+      NEO4J_dbms_allow__upgrade: "true"
+    networks:
+      - bloodhound-internal
+
+  # ─── Application ────────────────────────────────────────────────────────────
+  bloodhound:
+    image: specterops/bloodhound:${BLOODHOUND_TAG:-latest}
+    container_name: bloodhound-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    # Note: BloodHound image is a scratch/distroless Go binary — no shell, no curl, no wget.
+    # Healthcheck must use the binary's own CLI or be disabled. The /api/version endpoint
+    # returns 401 (Unauthorized) when the API is up, which is sufficient to confirm liveness.
+    # Using Docker's built-in healthcheck via the host network as a workaround is not viable
+    # without a shell. Instead, we rely on depends_on for startup ordering and restart policy
+    # for recovery. Traefik will not route to the container if it's not responding.
+    # healthcheck:
+    #   test: <not possible without a shell in the container>
+    environment:
+      bhe_database_connection: "user=${POSTGRES_USER:-bloodhound} password=${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file} dbname=${POSTGRES_DB:-bloodhound} host=postgres"
+      bhe_neo4j_connection: "neo4j://${NEO4J_USER:-neo4j}:${NEO4J_PASSWORD:?Please set NEO4J_PASSWORD in your .env file}@neo4j:7687/"
+      bhe_graph_driver: neo4j
+      bhe_disable_cypher_complexity_limit: "false"
+      bhe_enable_cypher_mutations: "false"
+      bhe_graph_query_memory_limit: "2"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bloodhound.rule=Host(`bloodhound.testing.blueteam.au`)"
+      - "traefik.http.routers.bloodhound.entrypoints=websecure"
+      - "traefik.http.routers.bloodhound.tls.certresolver=letsencrypt"
+      - "traefik.http.services.bloodhound.loadbalancer.server.port=8080"
+    networks:
+      - bloodhound-internal
+      - testing-proxy
+
+networks:
+  bloodhound-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  bloodhound_postgres_data:
+  bloodhound_neo4j_data:

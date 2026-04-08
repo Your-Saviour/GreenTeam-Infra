@@ -10,7 +10,9 @@ Priority is based on weighted value (60% blue, 30% green, 10% red) balanced agai
 
 - ~~**DFIR-IRIS**~~ — **DEPLOYED** → `testing/iris/`
 
-- **BloodHound** — Setup: 3/10 | Value: 8/10 | Priority Score: ★★★★★
+- ~~**BloodHound**~~ — **DEPLOYED** → `testing/bloodhound/`
+
+  ~~Setup: 3/10 | Value: 8/10 | Priority Score: ★★★★★~~
   Graph-based Active Directory attack path mapping tool that reveals hidden privilege relationships and lateral movement opportunities. Uses SharpHound/AzureHound collectors to enumerate AD objects into a Neo4j database, enabling red teams to discover attack chains and blue teams to identify privilege risks.
   GitHub (CE): https://github.com/SpecterOps/BloodHound
   GitHub (Legacy): https://github.com/SpecterOps/BloodHound-Legacy
