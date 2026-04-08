@@ -12,12 +12,22 @@ entryPoints:
   websecure:
     address: ":443"
 
+accessLog:
+  filePath: /var/log/traefik/access.log
+  bufferingSize: 100
+
 certificatesResolvers:
   letsencrypt:
     acme:
       email: admin@blueteam.au
       storage: /letsencrypt/acme.json
       tlsChallenge: {}
+
+experimental:
+  plugins:
+    crowdsec-bouncer:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.4.7
 
 providers:
   docker:

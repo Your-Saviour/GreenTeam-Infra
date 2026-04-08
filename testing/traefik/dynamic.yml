@@ -1,4 +1,15 @@
 http:
+  middlewares:
+    crowdsec-bouncer:
+      plugin:
+        crowdsec-bouncer:
+          enabled: true
+          crowdsecMode: stream
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: crowdsec-app:8080
+          crowdsecLapiKey: '{{ env "CROWDSEC_BOUNCER_KEY" }}'
+          logLevel: INFO
+
   serversTransports:
     wazuh-transport:
       insecureSkipVerify: true

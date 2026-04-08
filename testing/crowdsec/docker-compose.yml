@@ -1,0 +1,137 @@
+# CrowdSec Testing Stack (Engine + Grafana Dashboard + Prometheus)
+# Prerequisites:
+#   1. Copy .env.example to .env and generate secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Enable Traefik access logging and bouncer plugin (see testing/traefik/ changes)
+#   4. Start: docker compose up -d
+#
+# Resource requirements: ~512MB RAM minimum (crowdsec ~128MB, prometheus ~128MB,
+#   grafana ~128MB, postgres ~64MB)
+#
+# Notes:
+#   - CrowdSec auto-installs the traefik, http-cve, and linux collections on first start
+#   - The bouncer key is pre-registered via BOUNCER_KEY_traefik env var — it must
+#     match the key configured in Traefik's bouncer plugin middleware
+#   - CrowdSec Prometheus metrics are exposed on port 6060 (internal only)
+#   - Grafana default login: admin / <GRAFANA_ADMIN_PASSWORD from .env>
+#   - Prometheus data source is auto-provisioned in Grafana
+
+services:
+
+  # ─── CrowdSec Engine (LAPI + Agent) ─────────────────────────────────────────
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec-app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      start_period: 30s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/linux"
+      BOUNCER_KEY_traefik: ${CROWDSEC_BOUNCER_KEY:?Please set CROWDSEC_BOUNCER_KEY in your .env file}
+      TZ: Australia/Sydney
+    volumes:
+      - crowdsec_config:/etc/crowdsec
+      - crowdsec_data:/var/lib/crowdsec/data
+      - ./config/acquis.yaml:/etc/crowdsec/acquis.d/traefik.yaml:ro
+      - testing-traefik-accesslog:/var/log/traefik:ro
+    networks:
+      - crowdsec-internal
+      - testing-proxy
+
+  # ─── Prometheus (Metrics Scraper) ───────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: crowdsec-prometheus
+    restart: unless-stopped
+    depends_on:
+      crowdsec:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy || exit 1"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - crowdsec_prometheus_data:/prometheus
+    networks:
+      - crowdsec-internal
+
+  # ─── PostgreSQL (Grafana Backend) ───────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: crowdsec-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - crowdsec_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-grafana}
+      POSTGRES_USER: ${POSTGRES_USER:-grafana}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+    networks:
+      - crowdsec-internal
+
+  # ─── Grafana (Dashboard) ────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: crowdsec-grafana
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health || exit 1"]
+      start_period: 30s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: postgres:5432
+      GF_DATABASE_NAME: ${POSTGRES_DB:-grafana}
+      GF_DATABASE_USER: ${POSTGRES_USER:-grafana}
+      GF_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Please set GRAFANA_ADMIN_PASSWORD in your .env file}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - crowdsec_grafana_data:/var/lib/grafana
+      - ./config/grafana-datasource.yml:/etc/grafana/provisioning/datasources/crowdsec.yml:ro
+      - ./config/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/crowdsec.yml:ro
+      - ./config/dashboards:/var/lib/grafana/dashboards:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.crowdsec.rule=Host(`crowdsec.testing.blueteam.au`)"
+      - "traefik.http.routers.crowdsec.entrypoints=websecure"
+      - "traefik.http.routers.crowdsec.tls.certresolver=letsencrypt"
+      - "traefik.http.services.crowdsec.loadbalancer.server.port=3000"
+    networks:
+      - crowdsec-internal
+      - testing-proxy
+
+networks:
+  crowdsec-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  crowdsec_config:
+  crowdsec_data:
+  testing-traefik-accesslog:
+    external: true
+  crowdsec_prometheus_data:
+  crowdsec_postgres_data:
+  crowdsec_grafana_data:

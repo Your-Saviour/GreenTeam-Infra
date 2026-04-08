@@ -9,11 +9,14 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      CROWDSEC_BOUNCER_KEY: ${CROWDSEC_BOUNCER_KEY:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - testing-letsencrypt:/letsencrypt
+      - testing-traefik-accesslog:/var/log/traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.testing-dashboard.rule=Host(`traefik.testing.blueteam.au`)"
@@ -46,6 +49,8 @@ services:
 volumes:
   testing-letsencrypt:
   testing-dockhand_data:
+  testing-traefik-accesslog:
+    name: testing-traefik-accesslog
 
 networks:
   testing-proxy:
