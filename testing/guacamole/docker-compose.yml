@@ -57,6 +57,11 @@ services:
     image: guacamole/guacd:latest
     container_name: guacamole-guacd
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 4822 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
     networks:
       - guacamole-internal
 
@@ -69,7 +74,7 @@ services:
       postgres:
         condition: service_healthy
       guacd:
-        condition: service_started
+        condition: service_healthy
     environment:
       GUACD_HOSTNAME: guacd
       POSTGRESQL_HOSTNAME: postgres
