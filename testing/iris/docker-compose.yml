@@ -1,0 +1,151 @@
+# DFIR-IRIS Testing Stack
+# Prerequisites:
+#   1. Copy .env.example to .env and generate secrets per the instructions inside it
+#   2. Ensure testing-proxy network exists (start testing core stack first)
+#   3. Start: docker compose up -d
+#
+# Resource requirements: ~1.5GB RAM minimum
+#   - PostgreSQL: ~128MB
+#   - RabbitMQ: ~128MB
+#   - IRIS app (Gunicorn): ~512MB
+#   - IRIS worker (Celery): ~512MB
+#
+# Notes:
+#   - First start runs DB migrations automatically (~30-60s)
+#   - Default login: administrator / set via IRIS_ADM_PASSWORD in .env
+#   - The nginx container from upstream is skipped — Traefik handles TLS
+#   - Shared volumes between app and worker are required for file processing
+
+services:
+
+  # ─── Database ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: iris-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 15s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - iris_postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-iris_db}
+      POSTGRES_USER: ${POSTGRES_USER:-iris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+    networks:
+      - iris-internal
+
+  # ─── Message Queue ──────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: iris-rabbitmq
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      start_period: 30s
+      interval: 30s
+      retries: 5
+      timeout: 10s
+    volumes:
+      - iris_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - iris-internal
+
+  # ─── Application ────────────────────────────────────────────────────────────
+  app:
+    image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
+    container_name: iris-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: ["./iris-entrypoint.sh", "iriswebapp"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000 || exit 1"]
+      start_period: 90s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      DOCKERIZED: 1
+      POSTGRES_SERVER: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-iris_db}
+      POSTGRES_USER: ${POSTGRES_USER:-iris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+      POSTGRES_ADMIN_USER: ${POSTGRES_USER:-iris}
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+      IRIS_SECRET_KEY: ${IRIS_SECRET_KEY:?Please set IRIS_SECRET_KEY in your .env file}
+      IRIS_SECURITY_PASSWORD_SALT: ${IRIS_SECURITY_PASSWORD_SALT:?Please set IRIS_SECURITY_PASSWORD_SALT in your .env file}
+      IRIS_ADM_PASSWORD: ${IRIS_ADM_PASSWORD:?Please set IRIS_ADM_PASSWORD in your .env file}
+      IRIS_ADM_EMAIL: ${IRIS_ADM_EMAIL:-admin@localhost}
+      IRIS_ADM_USERNAME: ${IRIS_ADM_USERNAME:-administrator}
+      IRIS_AUTHENTICATION_TYPE: local
+      CELERY_BROKER: amqp://guest:guest@rabbitmq
+      LOG_LEVEL: info
+    volumes:
+      - iris_downloads:/home/iris/downloads
+      - iris_user_templates:/home/iris/user_templates
+      - iris_server_data:/home/iris/server_data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.iris.rule=Host(`iris.testing.blueteam.au`)"
+      - "traefik.http.routers.iris.entrypoints=websecure"
+      - "traefik.http.routers.iris.tls.certresolver=letsencrypt"
+      - "traefik.http.services.iris.loadbalancer.server.port=8000"
+    networks:
+      - iris-internal
+      - testing-proxy
+
+  # ─── Worker ─────────────────────────────────────────────────────────────────
+  worker:
+    image: ghcr.io/dfir-iris/iriswebapp_app:v2.4.20
+    container_name: iris-worker
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    command: ["./wait-for-iriswebapp.sh", "app:8000", "./iris-entrypoint.sh", "iris-worker"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f celery || exit 1"]
+      start_period: 90s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      DOCKERIZED: 1
+      POSTGRES_SERVER: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-iris_db}
+      POSTGRES_USER: ${POSTGRES_USER:-iris}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+      POSTGRES_ADMIN_USER: ${POSTGRES_USER:-iris}
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD in your .env file}
+      IRIS_SECRET_KEY: ${IRIS_SECRET_KEY:?Please set IRIS_SECRET_KEY in your .env file}
+      IRIS_SECURITY_PASSWORD_SALT: ${IRIS_SECURITY_PASSWORD_SALT:?Please set IRIS_SECURITY_PASSWORD_SALT in your .env file}
+      CELERY_BROKER: amqp://guest:guest@rabbitmq
+      LOG_LEVEL: info
+    volumes:
+      - iris_downloads:/home/iris/downloads
+      - iris_user_templates:/home/iris/user_templates
+      - iris_server_data:/home/iris/server_data
+    networks:
+      - iris-internal
+
+networks:
+  iris-internal:
+    internal: true
+  testing-proxy:
+    external: true
+
+volumes:
+  iris_postgres_data:
+  iris_rabbitmq_data:
+  iris_downloads:
+  iris_user_templates:
+  iris_server_data:

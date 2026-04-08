@@ -8,14 +8,7 @@ Priority is based on weighted value (60% blue, 30% green, 10% red) balanced agai
 
 - ~~**CrowdSec**~~ — **DEPLOYED** → `testing/crowdsec/`
 
-- **DFIR-IRIS** — Setup: 3/10 | Value: 8/10 | Priority Score: ★★★★★
-  Open-source collaborative incident response platform for managing and analyzing security investigations. Provides case management, alert triage, timeline reconstruction, and forensic analysis with real-time collaboration. Extensible modules integrate with VirusTotal, MISP, and IntelOwl.
-  GitHub: https://github.com/dfir-iris/iris-web
-  Docs: https://docs.dfir-iris.org
-  Website: https://www.dfir-iris.org/
-  Docker: docker-compose in the iris-web repo; `docker compose up` deploys on port 443
-  _Setup notes: Official docker-compose provided. PostgreSQL + RabbitMQ + web app + worker containers. Well-structured for adaptation to testing stack pattern. Web UI on single port — clean Traefik integration. Good documentation._
-  _Value notes: Blue 10/10 — incident response case management is essential for mature SOC ops. Green 7/10 — track exercise findings. Red 1/10. Integrates with MISP, VirusTotal — ties the defensive toolchain together._
+- ~~**DFIR-IRIS**~~ — **DEPLOYED** → `testing/iris/`
 
 - **BloodHound** — Setup: 3/10 | Value: 8/10 | Priority Score: ★★★★★
   Graph-based Active Directory attack path mapping tool that reveals hidden privilege relationships and lateral movement opportunities. Uses SharpHound/AzureHound collectors to enumerate AD objects into a Neo4j database, enabling red teams to discover attack chains and blue teams to identify privilege risks.
