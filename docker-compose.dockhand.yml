@@ -120,7 +120,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
       - ./data/custom-templates:/templates
-      - ./blueprints:/blueprints/custom
     depends_on:
       postgresql:
         condition: service_healthy
