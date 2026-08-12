@@ -5,7 +5,7 @@
 # All services use the shared 'proxy' network for Traefik discovery.
 #
 # Current services:
-#   authentik    v2026.2.1  - https://docs.goauthentik.io   (auth.blueteam.au)
+#   authentik    v2026.2.6  - https://docs.goauthentik.io   (auth.blueteam.au)
 #   Homarr       (latest)   - https://homarr.dev             (home.blueteam.au)
 #   Vaultwarden  (latest)   - https://github.com/dani-garcia/vaultwarden  (vault.gt.blueteam.au)
 #
@@ -57,7 +57,7 @@ services:
   # authentik Server - Handles SSO flows, OIDC/SAML/LDAP providers, and the UI
   # ---------------------------------------------------------------------------
   server:
-    image: ghcr.io/goauthentik/server:2026.2.1
+    image: ghcr.io/goauthentik/server:2026.2.6
     container_name: authentik-server
     restart: unless-stopped
     command: server
@@ -97,7 +97,7 @@ services:
   # authentik Worker - Background tasks (emails, LDAP sync, outpost management)
   # ---------------------------------------------------------------------------
   worker:
-    image: ghcr.io/goauthentik/server:2026.2.1
+    image: ghcr.io/goauthentik/server:2026.2.6
     container_name: authentik-worker
     restart: unless-stopped
     command: worker
