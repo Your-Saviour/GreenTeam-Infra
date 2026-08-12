@@ -68,6 +68,7 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
       AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?Please set AUTHENTIK_SECRET_KEY in your .env file}
+      AUTHENTIK_FOOTER_LINKS: '[{"name":"Don’t have an account? Check the Discord pinned messages.","href":null}]'
       # -- Optional: Email configuration --
       # AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
       # AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
@@ -108,6 +109,7 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
       AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_FOOTER_LINKS: '[{"name":"Don’t have an account? Check the Discord pinned messages.","href":null}]'
       # -- Match any email settings configured on the server above --
       # AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
       # AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
