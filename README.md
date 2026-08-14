@@ -26,7 +26,7 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 | **midpoint-postgresql** | `postgres:16-alpine` | — | Isolated native repository and audit database. |
 | **midpoint-connector-init** | `curlimages/curl:8.12.1` | — | Downloads and checksum-verifies the pinned SCIM2 connector. |
 | **midpoint-db-init** | `evolveum/midpoint:4.10.3-alpine` | — | Idempotently initializes native repository and audit schemas. |
-| **midpoint-bootstrap** | `curlimages/curl:8.12.1` | — | Opt-in profile that validates Authentik and imports fixed-OID JIT objects. |
+| **midpoint-bootstrap** | `curlimages/curl:8.12.1` | — | Automatic one-shot job that validates Authentik and imports fixed-OID JIT objects after server startup. |
 
 ### Dockhand Services Stack (`docker-compose.dockhand.yml`)
 
@@ -65,13 +65,7 @@ docker compose -f docker-compose.dockhand.yml up -d
 
 ### 3. midPoint JIT Access
 
-```bash
-cd midpoint
-cp .env.example .env
-# Fill all required secrets and Authentik credentials, then:
-docker compose up -d
-docker compose --profile bootstrap run --rm midpoint-bootstrap
-```
+In Dockhand, create a stack from `midpoint/docker-compose.yml`, enter all variables from `midpoint/.env.example` in the stack environment editor, and deploy the complete stack. The bootstrap job runs automatically after midPoint becomes healthy and exits after importing the fixed-OID configuration.
 
 Complete the Authentik OIDC/SCIM prerequisites and production acceptance tests in [midpoint/README.md](midpoint/README.md) before binding any JIT group to an application.
 

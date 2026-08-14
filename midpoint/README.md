@@ -28,7 +28,7 @@ In Authentik:
 4. Create a writable SCIM source with slug `midpoint-jit`, base URL above, and a dedicated high-trust bearer token. Its permission scope must cover user/group discovery and member PATCH for `jit-*`, but not user create/update/delete or non-JIT groups. Never reuse an Authentik user/API token.
 5. Leave all four groups unbound to applications. They grant no downstream access until deliberate onboarding.
 
-Create local configuration:
+For a command-line deployment, create local configuration:
 
 ```bash
 cd midpoint
@@ -41,14 +41,17 @@ chmod 600 .env
 
 Fill every blank value. Compose `${VAR:?…}` guards fail closed. The populated `.env` is ignored by Git.
 
+For Dockhand, create a stack from this directory's `docker-compose.yml` and enter the same variables in Dockhand's stack environment editor instead of creating `.env`. All five secrets (`MIDPOINT_PG_PASSWORD`, `MIDPOINT_ADMIN_PASSWORD`, `MIDPOINT_OIDC_CLIENT_ID`, `MIDPOINT_OIDC_CLIENT_SECRET`, and `MIDPOINT_SCIM_TOKEN`) must be present before deployment. Keep secret values in Dockhand's protected environment storage where available.
+
 ## First deployment
 
 ```bash
 docker compose config --quiet
 docker compose up -d
 docker compose logs -f midpoint-connector-init midpoint-db-init midpoint-server
-docker compose --profile bootstrap run --rm midpoint-bootstrap
 ```
+
+Dockhand users deploy the complete stack once after entering its environment variables. The one-shot bootstrap service starts automatically after `midpoint-server` is healthy; no separate console command is required. An exited `midpoint-bootstrap` container with exit code zero means bootstrap completed successfully. Redeploying the stack safely reruns it.
 
 Connector initialization downloads only SCIM connector 1.2.9 and verifies SHA-256 `c13d51188510f16a53379f3f7e640711aa9bc08c9eb31378417080298207db7a`. Database initialization uses `init-native` followed by Ninja repository and audit schemas. Bootstrap validates public OIDC discovery and authenticated SCIM discovery before rendering tracked objects into a temporary directory. Fixed OIDs and REST replacement make it idempotent; the temporary plaintext rendering is deleted when it exits, while protected values are encrypted by the midPoint repository.
 
@@ -95,6 +98,7 @@ For upgrades, read Evolveum release and sequential-upgrade notes, back up, pin t
 ## Troubleshooting
 
 - `proxy` missing: start the root Compose stack.
+- Bootstrap remains running or exits non-zero: inspect the `midpoint-bootstrap` logs in Dockhand. It should run once and exit zero after the server becomes healthy.
 - Connector init fails: do not bypass checksum verification; verify the pinned artifact URL/version.
 - OIDC redirect mismatch: compare Authentik's exact URI with the URI above, including `/midpoint`.
 - Login correlation fails: inspect `preferred_username`; do not fall back to email or mutable display name.
