@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3" oid="8dfe9f58-24e7-4cb2-8421-030000000001">
+  <name>JIT Standard Access</name>
+  <description>Self-service access. Default and absolute maximum validity: PT4H. Maps only to jit-access-standard.</description>
+  <displayName>JIT Standard Access (maximum 4 hours)</displayName>
+  <requestable>true</requestable>
+  <riskLevel>low</riskLevel>
+  <extension xmlns:jit="https://gt.blueteam.au/xml/ns/jit">
+    <jit:targetGroup>jit-access-standard</jit:targetGroup>
+    <jit:defaultDuration>PT4H</jit:defaultDuration>
+    <jit:maximumDuration>PT4H</jit:maximumDuration>
+    <jit:approvalRequired>false</jit:approvalRequired>
+  </extension>
+</role>

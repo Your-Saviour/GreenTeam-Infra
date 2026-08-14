@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3" oid="8dfe9f58-24e7-4cb2-8421-020000000001">
+  <name>jit-requesters</name>
+  <displayName>JIT Requester</displayName>
+  <description>Assigned by inbound membership in jit-requesters. Allows catalogue viewing and requests, not administration.</description>
+  <authorization><action>http://midpoint.evolveum.com/xml/ns/public/security/authorization-ui-3#selfServiceAll</action></authorization>
+  <authorization><action>http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#read</action><object><type>RoleType</type></object></authorization>
+  <authorization><action>http://midpoint.evolveum.com/xml/ns/public/security/authorization-model-3#assign</action><phase>request</phase></authorization>
+</role>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3" oid="8dfe9f58-24e7-4cb2-8421-030000000002">
+  <name>JIT Sensitive Access</name>
+  <description>Independent approval required. Reason and ticket/reference mandatory. Default and maximum validity: PT1H.</description>
+  <displayName>JIT Sensitive Access (approval, maximum 1 hour)</displayName>
+  <requestable>true</requestable>
+  <riskLevel>high</riskLevel>
+  <extension xmlns:jit="https://gt.blueteam.au/xml/ns/jit">
+    <jit:targetGroup>jit-access-sensitive</jit:targetGroup>
+    <jit:defaultDuration>PT1H</jit:defaultDuration>
+    <jit:maximumDuration>PT1H</jit:maximumDuration>
+    <jit:approvalRequired>true</jit:approvalRequired>
+    <jit:approvalGroup>jit-approvers</jit:approvalGroup>
+    <jit:independentApproval>true</jit:independentApproval>
+    <jit:reasonRequired>true</jit:reasonRequired>
+    <jit:ticketRequired>true</jit:ticketRequired>
+  </extension>
+</role>

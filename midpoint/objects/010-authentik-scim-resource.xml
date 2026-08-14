@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resource xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:c="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+          xmlns:icfs="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/resource-schema-3"
+          xmlns:ri="http://midpoint.evolveum.com/xml/ns/public/resource/instance-3"
+          oid="8dfe9f58-24e7-4cb2-8421-010000000001">
+  <name>Authentik SCIM - JIT namespace</name>
+  <description>Inbound identities and narrowly-scoped jit-* group membership. Never correlate this resource with authentik Admins.</description>
+  <connectorRef type="c:ConnectorType">
+    <filter>
+      <q:equal xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3">
+        <q:path>connectorType</q:path>
+        <q:value>com.exclamationlabs.connid.base.scim2.Scim2Connector</q:value>
+      </q:equal>
+    </filter>
+  </connectorRef>
+  <connectorConfiguration xmlns:scim="http://midpoint.evolveum.com/xml/ns/public/connector/icf-1/bundle/connector-scim2/com.exclamationlabs.connid.base.scim2.Scim2Connector">
+    <scim:configurationProperties>
+      <scim:serviceUrl>@@SCIM_URL@@</scim:serviceUrl>
+      <scim:token><t:clearValue xmlns:t="http://prism.evolveum.com/xml/ns/public/types-3">@@SCIM_TOKEN@@</t:clearValue></scim:token>
+      <scim:enableDynamicSchema>true</scim:enableDynamicSchema>
+      <scim:enableStandardSchema>true</scim:enableStandardSchema>
+      <scim:usersEndpointUrl>/Users</scim:usersEndpointUrl>
+      <scim:groupsEndpointUrl>/Groups</scim:groupsEndpointUrl>
+    </scim:configurationProperties>
+  </connectorConfiguration>
+  <schemaHandling>
+    <objectType>
+      <kind>account</kind><intent>default</intent><default>true</default>
+      <delineation><objectClass>ri:User</objectClass></delineation>
+      <focus><type>c:UserType</type></focus>
+      <attribute><ref>ri:userName</ref><inbound><target><path>name</path></target></inbound></attribute>
+      <attribute><ref>ri:displayName</ref><inbound><target><path>fullName</path></target></inbound></attribute>
+      <attribute><ref>ri:emails</ref><inbound><target><path>emailAddress</path></target></inbound></attribute>
+      <synchronization><reaction><situation>unmatched</situation><actions><addFocus/></actions></reaction></synchronization>
+    </objectType>
+    <objectType>
+      <kind>entitlement</kind><intent>jit-group</intent><default>true</default>
+      <delineation>
+        <objectClass>ri:Group</objectClass>
+        <filter><q:text xmlns:q="http://prism.evolveum.com/xml/ns/public/query-3">attributes/displayName startsWith "jit-"</q:text></filter>
+      </delineation>
+      <focus><type>c:RoleType</type></focus>
+      <attribute><ref>ri:displayName</ref><inbound><target><path>name</path></target></inbound></attribute>
+      <synchronization><reaction><situation>unmatched</situation><actions><addFocus/></actions></reaction></synchronization>
+    </objectType>
+    <associationType>
+      <kind>entitlement</kind><intent>group-membership</intent>
+      <association><ref>ri:group</ref></association>
+      <subject><objectType><kind>account</kind><intent>default</intent></objectType></subject>
+      <object><objectType><kind>entitlement</kind><intent>jit-group</intent></objectType></object>
+      <direction>objectToSubject</direction>
+    </associationType>
+  </schemaHandling>
+  <capabilities xmlns:cap="http://midpoint.evolveum.com/xml/ns/public/resource/capabilities-3">
+    <configured><cap:create><cap:enabled>false</cap:enabled></cap:create><cap:delete><cap:enabled>false</cap:enabled></cap:delete></configured>
+  </capabilities>
+</resource>

@@ -1,3 +1,4 @@
 .env
+midpoint/.env
 acme.json
 testing/wazuh/config/wazuh_indexer_ssl_certs/

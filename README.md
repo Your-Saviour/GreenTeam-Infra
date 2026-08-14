@@ -18,6 +18,16 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 | **wikijs** | `ghcr.io/requarks/wiki:2` | `wiki.blueteam.au` | Modern wiki engine with WYSIWYG and Markdown editing. Authenticates via OIDC through authentik (configured in Wiki.js admin UI). |
 | **wikijs-postgresql** | `postgres:16-alpine` | — | Dedicated PostgreSQL database for Wiki.js. Only accessible on the isolated internal network. |
 
+### midPoint JIT Stack (`midpoint/docker-compose.yml`)
+
+| Container | Image | Domain | Description |
+|-----------|-------|--------|-------------|
+| **midpoint-server** | `evolveum/midpoint:4.10.3-alpine` | `access.gt.blueteam.au/midpoint` | Temporary-access catalogue, approvals, assignment validity, provisioning, and audit. Authenticates through Authentik. |
+| **midpoint-postgresql** | `postgres:16-alpine` | — | Isolated native repository and audit database. |
+| **midpoint-connector-init** | `curlimages/curl:8.12.1` | — | Downloads and checksum-verifies the pinned SCIM2 connector. |
+| **midpoint-db-init** | `evolveum/midpoint:4.10.3-alpine` | — | Idempotently initializes native repository and audit schemas. |
+| **midpoint-bootstrap** | `curlimages/curl:8.12.1` | — | Opt-in profile that validates Authentik and imports fixed-OID JIT objects. |
+
 ### Dockhand Services Stack (`docker-compose.dockhand.yml`)
 
 | Container | Image | Domain | Description |
@@ -53,7 +63,19 @@ echo "HOMARR_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
 docker compose -f docker-compose.dockhand.yml up -d
 ```
 
-### 3. First-Time Setup
+### 3. midPoint JIT Access
+
+```bash
+cd midpoint
+cp .env.example .env
+# Fill all required secrets and Authentik credentials, then:
+docker compose up -d
+docker compose --profile bootstrap run --rm midpoint-bootstrap
+```
+
+Complete the Authentik OIDC/SCIM prerequisites and production acceptance tests in [midpoint/README.md](midpoint/README.md) before binding any JIT group to an application.
+
+### 4. First-Time Setup
 
 1. Complete authentik initial setup at `https://auth.blueteam.au/if/flow/initial-setup/`
 2. In authentik, create an OAuth2/OIDC application for Homarr:
@@ -131,7 +153,8 @@ Internet (80/443)
        |                           ├── authentik server
        |                           ├── Homarr
        |                           ├── Vaultwarden
-       |                           └── Wiki.js
+       |                           ├── Wiki.js
+       |                           └── midPoint
        |
   HTTP → HTTPS redirect
   Let's Encrypt TLS (auto)
@@ -143,6 +166,10 @@ authentik-internal network (isolated)
 
 wikijs-internal network (isolated)
   ├── Wiki.js
+  └── PostgreSQL
+
+midpoint-internal network (isolated)
+  ├── midPoint server and initialization jobs
   └── PostgreSQL
 
 wazuh-internal network (isolated)
@@ -187,6 +214,9 @@ my-service:
 docker-compose.yml              # Core: Traefik + Dockhand
 docker-compose.dockhand.yml     # Services: authentik, Homarr, Vaultwarden
 wikijs/docker-compose.yml       # Wiki.js + dedicated PostgreSQL
+midpoint/docker-compose.yml     # midPoint JIT governance + PostgreSQL
+midpoint/objects/               # Fixed-OID Authentik/JIT bootstrap objects
+midpoint/README.md              # Setup, acceptance, operations, and onboarding
 testing/docker-compose.yml       # Testing core: Traefik + Dockhand (*.testing.blueteam.au)
 testing/wazuh/docker-compose.yml # Wazuh SIEM testing stack
 testing/awx/docker-compose.yml  # AWX (Ansible) testing stack
@@ -197,3 +227,9 @@ traefik/traefik.yml             # Traefik static configuration
 ## Upgrading authentik
 
 Do **not** skip major versions. Always upgrade outposts at the same time as the server. See the [authentik upgrade docs](https://docs.goauthentik.io/install-config/upgrade/).
+
+Before upgrading midPoint, back up its PostgreSQL database and home volume together, run the Evolveum Ninja pre-upgrade and schema procedure, and keep initialization/server image versions identical. Re-run every JIT acceptance test after upgrade.
+
+## JIT revocation boundary
+
+Removing an Authentik group changes newly issued OIDC claims. Existing Homarr, Wiki.js, Vaultwarden, or other downstream sessions may remain usable until their next token refresh, session expiry, or login; immediate downstream session termination is outside the v1 guarantee.

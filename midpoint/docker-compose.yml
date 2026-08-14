@@ -1,0 +1,141 @@
+name: midpoint
+
+x-midpoint-environment: &midpoint-environment
+  MP_SET_midpoint_repository_jdbcUsername: ${MIDPOINT_PG_USER:-midpoint}
+  MP_SET_midpoint_repository_jdbcPassword: ${MIDPOINT_PG_PASSWORD:?Set MIDPOINT_PG_PASSWORD in midpoint/.env}
+  MP_SET_midpoint_repository_jdbcUrl: jdbc:postgresql://midpoint-postgresql:5432/${MIDPOINT_PG_DB:-midpoint}
+  MP_SET_midpoint_repository_database: postgresql
+  MP_SET_midpoint_repository_initializationFailTimeout: "60000"
+  MP_SET_server_servlet_context-path: /midpoint
+  MP_SET_server_forward-headers-strategy: framework
+  MP_SET_user_timezone: ${MIDPOINT_TIMEZONE:-Australia/Adelaide}
+  MP_MEM_INIT: ${MIDPOINT_MEM_INIT:-1024m}
+  MP_MEM_MAX: ${MIDPOINT_MEM_MAX:-2048m}
+  MP_NO_ENV_COMPAT: "1"
+
+services:
+  midpoint-postgresql:
+    image: docker.io/library/postgres:16-alpine
+    container_name: midpoint-postgresql
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${MIDPOINT_PG_USER:-midpoint}
+      POSTGRES_DB: ${MIDPOINT_PG_DB:-midpoint}
+      POSTGRES_PASSWORD: ${MIDPOINT_PG_PASSWORD:?Set MIDPOINT_PG_PASSWORD in midpoint/.env}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - midpoint_postgresql_data:/var/lib/postgresql/data
+    networks:
+      - midpoint-internal
+
+  midpoint-connector-init:
+    image: docker.io/curlimages/curl:8.12.1
+    container_name: midpoint-connector-init
+    restart: "no"
+    user: "0:0"
+    command:
+      - /bin/sh
+      - /bootstrap/install-connector.sh
+    volumes:
+      - midpoint_home:/opt/midpoint/var
+      - ./bootstrap:/bootstrap:ro
+    networks:
+      - midpoint-internal
+      - proxy
+
+  midpoint-db-init:
+    image: docker.io/evolveum/midpoint:4.10.3-alpine
+    container_name: midpoint-db-init
+    restart: "no"
+    command:
+      - /bin/bash
+      - /bootstrap/init-db.sh
+    environment:
+      <<: *midpoint-environment
+      MP_INIT_CFG: /opt/midpoint/var
+    depends_on:
+      midpoint-postgresql:
+        condition: service_healthy
+      midpoint-connector-init:
+        condition: service_completed_successfully
+    volumes:
+      - midpoint_home:/opt/midpoint/var
+      - ./bootstrap:/bootstrap:ro
+    networks:
+      - midpoint-internal
+
+  midpoint-server:
+    image: docker.io/evolveum/midpoint:4.10.3-alpine
+    container_name: midpoint-server
+    restart: unless-stopped
+    command: ["/opt/midpoint/bin/midpoint.sh", "container"]
+    environment:
+      <<: *midpoint-environment
+      MP_UNSET_midpoint_repository_hibernateHbm2ddl: "1"
+      MP_SET_midpoint_administrator_initialPassword: ${MIDPOINT_ADMIN_PASSWORD:?Set MIDPOINT_ADMIN_PASSWORD in midpoint/.env}
+    depends_on:
+      midpoint-postgresql:
+        condition: service_healthy
+      midpoint-db-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/midpoint/ || exit 1"]
+      start_period: 180s
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    volumes:
+      - midpoint_home:/opt/midpoint/var
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.midpoint.rule=Host(`access.gt.blueteam.au`) && PathPrefix(`/midpoint`)
+      - traefik.http.routers.midpoint.entrypoints=websecure
+      - traefik.http.routers.midpoint.tls.certresolver=letsencrypt
+      - traefik.http.services.midpoint.loadbalancer.server.port=8080
+    networks:
+      - midpoint-internal
+      - proxy
+
+  midpoint-bootstrap:
+    image: docker.io/curlimages/curl:8.12.1
+    container_name: midpoint-bootstrap
+    profiles: [bootstrap]
+    restart: "no"
+    environment:
+      MIDPOINT_URL: http://midpoint-server:8080/midpoint
+      MIDPOINT_ADMIN_PASSWORD: ${MIDPOINT_ADMIN_PASSWORD:?Set MIDPOINT_ADMIN_PASSWORD in midpoint/.env}
+      MIDPOINT_PUBLIC_URL: ${MIDPOINT_PUBLIC_URL:-https://access.gt.blueteam.au/midpoint}
+      MIDPOINT_AUTHENTIK_ISSUER: ${MIDPOINT_AUTHENTIK_ISSUER:-https://auth.blueteam.au/application/o/midpoint/}
+      MIDPOINT_AUTHENTIK_SCIM_URL: ${MIDPOINT_AUTHENTIK_SCIM_URL:-https://auth.blueteam.au/source/scim/midpoint-jit/v2}
+      MIDPOINT_OIDC_CLIENT_ID: ${MIDPOINT_OIDC_CLIENT_ID:?Set MIDPOINT_OIDC_CLIENT_ID in midpoint/.env}
+      MIDPOINT_OIDC_CLIENT_SECRET: ${MIDPOINT_OIDC_CLIENT_SECRET:?Set MIDPOINT_OIDC_CLIENT_SECRET in midpoint/.env}
+      MIDPOINT_SCIM_TOKEN: ${MIDPOINT_SCIM_TOKEN:?Set MIDPOINT_SCIM_TOKEN in midpoint/.env}
+    command: ["/bin/sh", "/bootstrap/bootstrap.sh"]
+    depends_on:
+      midpoint-server:
+        condition: service_healthy
+    volumes:
+      - ./bootstrap:/bootstrap:ro
+      - ./objects:/objects:ro
+    networks:
+      - midpoint-internal
+      - proxy
+
+volumes:
+  midpoint_postgresql_data:
+    driver: local
+  midpoint_home:
+    driver: local
+
+networks:
+  midpoint-internal:
+    internal: true
+  proxy:
+    external: true

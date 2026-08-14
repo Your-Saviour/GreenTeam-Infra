@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3" oid="8dfe9f58-24e7-4cb2-8421-040000000001">
+  <name>Authentik user reconciliation (5 minutes)</name><executionState>runnable</executionState>
+  <schedule><recurrence>recurring</recurrence><interval>300</interval></schedule>
+  <activity><work><reconciliation><resourceObjects><resourceRef oid="8dfe9f58-24e7-4cb2-8421-010000000001"/><kind>account</kind><intent>default</intent></resourceObjects></reconciliation></work></activity>
+</task>

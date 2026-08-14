@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<role xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3" oid="8dfe9f58-24e7-4cb2-8421-020000000002">
+  <name>jit-approvers</name>
+  <displayName>JIT Approver</displayName>
+  <description>Assigned only from jit-approvers. Approvals must be performed by somebody other than the requester.</description>
+  <inducement><targetRef oid="00000000-0000-0000-0000-000000000008" type="RoleType"/></inducement>
+</role>

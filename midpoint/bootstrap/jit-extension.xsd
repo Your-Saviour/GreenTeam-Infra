@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:a="http://prism.evolveum.com/xml/ns/public/annotation-3"
+            targetNamespace="https://gt.blueteam.au/xml/ns/jit"
+            elementFormDefault="qualified">
+  <xsd:element name="targetGroup" type="xsd:string"><xsd:annotation><xsd:appinfo><a:indexed>true</a:indexed></xsd:appinfo></xsd:annotation></xsd:element>
+  <xsd:element name="defaultDuration" type="xsd:duration"/>
+  <xsd:element name="maximumDuration" type="xsd:duration"/>
+  <xsd:element name="approvalRequired" type="xsd:boolean"/>
+  <xsd:element name="approvalGroup" type="xsd:string"/>
+  <xsd:element name="independentApproval" type="xsd:boolean"/>
+  <xsd:element name="reasonRequired" type="xsd:boolean"/>
+  <xsd:element name="ticketRequired" type="xsd:boolean"/>
+</xsd:schema>

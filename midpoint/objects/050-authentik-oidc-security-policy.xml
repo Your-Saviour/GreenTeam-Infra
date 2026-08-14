@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<securityPolicy xmlns="http://midpoint.evolveum.com/xml/ns/public/common/common-3"
+                xmlns:t="http://prism.evolveum.com/xml/ns/public/types-3"
+                oid="8dfe9f58-24e7-4cb2-8421-050000000001">
+  <name>Authentik default with local break-glass</name>
+  <authentication>
+    <modules>
+      <loginForm><identifier>loginForm</identifier></loginForm>
+      <oidc>
+        <identifier>authentik</identifier>
+        <client>
+          <registrationId>authentik</registrationId>
+          <clientId>@@OIDC_CLIENT_ID@@</clientId>
+          <clientSecret><t:clearValue>@@OIDC_CLIENT_SECRET@@</t:clearValue></clientSecret>
+          <clientAuthenticationMethod>clientSecretBasic</clientAuthenticationMethod>
+          <scope>openid</scope><scope>profile</scope><scope>email</scope>
+          <nameOfUsernameAttribute>preferred_username</nameOfUsernameAttribute>
+          <usePkce>true</usePkce>
+          <openIdProvider><issuerUri>@@OIDC_ISSUER@@</issuerUri></openIdProvider>
+        </client>
+      </oidc>
+    </modules>
+    <sequence>
+      <identifier>authentik</identifier>
+      <channel><channelId>http://midpoint.evolveum.com/xml/ns/public/common/channels-3#user</channelId><default>true</default><urlSuffix>authentik</urlSuffix></channel>
+      <module><identifier>authentik</identifier><order>10</order><necessity>sufficient</necessity></module>
+    </sequence>
+    <sequence>
+      <identifier>gui-login-form</identifier>
+      <channel><channelId>http://midpoint.evolveum.com/xml/ns/public/common/channels-3#user</channelId><urlSuffix>gui-login-form</urlSuffix></channel>
+      <module><identifier>loginForm</identifier><order>10</order><necessity>sufficient</necessity></module>
+    </sequence>
+  </authentication>
+</securityPolicy>
