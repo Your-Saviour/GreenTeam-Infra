@@ -21,10 +21,18 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.mailflow.rule=Host(`${MAILFLOW_DOMAIN:-mailflow.blueteam.au}`)
+      - traefik.http.routers.mailflow.rule=Host(`${MAILFLOW_DOMAIN:-mail.blueteam.au}`)
       - traefik.http.routers.mailflow.entrypoints=websecure
       - traefik.http.routers.mailflow.tls.certresolver=letsencrypt
       - traefik.http.services.mailflow.loadbalancer.server.port=80
+      - traefik.http.routers.mailflow-alias.rule=Host(`${MAILFLOW_ALIAS_DOMAIN:-mailflow.blueteam.au}`)
+      - traefik.http.routers.mailflow-alias.entrypoints=websecure
+      - traefik.http.routers.mailflow-alias.tls.certresolver=letsencrypt
+      - traefik.http.routers.mailflow-alias.service=mailflow
+      - traefik.http.routers.mailflow-alias.middlewares=mailflow-canonical
+      - traefik.http.middlewares.mailflow-canonical.redirectregex.regex=^https://[^/]+/(.*)
+      - traefik.http.middlewares.mailflow-canonical.redirectregex.replacement=https://${MAILFLOW_DOMAIN:-mail.blueteam.au}/$${1}
+      - traefik.http.middlewares.mailflow-canonical.redirectregex.permanent=true
     networks:
       - proxy
       - mailflow
@@ -37,8 +45,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      APP_URL: https://${MAILFLOW_DOMAIN:-mailflow.blueteam.au}
-      FRONTEND_URL: https://${MAILFLOW_DOMAIN:-mailflow.blueteam.au}
+      APP_URL: https://${MAILFLOW_DOMAIN:-mail.blueteam.au}
+      FRONTEND_URL: https://${MAILFLOW_DOMAIN:-mail.blueteam.au}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in mailflow/.env}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in mailflow/.env}
       DB_HOST: postgres

@@ -1,4 +1,4 @@
-"""Run from mailflow/: python3 verify-sso.py [https://mailflow.blueteam.au]."""
+"""Run from mailflow/: python3 verify-sso.py [primary URL] [alias URL]."""
 import json
 import subprocess
 import sys
@@ -12,8 +12,15 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-base = (sys.argv[1] if len(sys.argv) > 1 else "https://mailflow.blueteam.au").rstrip("/")
+base = (sys.argv[1] if len(sys.argv) > 1 else "https://mail.blueteam.au").rstrip("/")
+alias = (sys.argv[2] if len(sys.argv) > 2 else "https://mailflow.blueteam.au").rstrip("/")
 opener = urllib.request.build_opener(NoRedirect)
+try:
+    opener.open(alias + "/api/health?redirect-check=1", timeout=20)
+    raise AssertionError("Alias did not redirect to the primary hostname")
+except urllib.error.HTTPError as response:
+    assert response.code in (301, 308), "Alias must redirect permanently"
+    assert response.headers["Location"] == base + "/api/health?redirect-check=1", "Redirect lost path or query"
 with opener.open(base + "/api/auth/oidc/providers", timeout=20) as response:
     providers = json.load(response)["providers"]
 assert any(p["slug"] == "authentik" for p in providers), "Authentik is missing"

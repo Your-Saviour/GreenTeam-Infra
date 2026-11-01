@@ -1,10 +1,12 @@
 # MailFlow
 
-Standalone MailFlow stack using the [upstream prebuilt images](https://github.com/maathimself/mailflow/blob/v4.1.1/docker-compose.ghcr.yml), pinned to 4.1.1. Traefik terminates HTTPS at `https://mailflow.blueteam.au` and forwards to MailFlow's nginx frontend. Authentik provides SSO. The backend has outbound access for IMAP, SMTP, and OAuth; PostgreSQL and Redis use an isolated internal network. No host ports are published.
+Standalone MailFlow stack using the [upstream prebuilt images](https://github.com/maathimself/mailflow/blob/v4.1.1/docker-compose.ghcr.yml), pinned to 4.1.1. Traefik terminates HTTPS at `https://mail.blueteam.au` and forwards to MailFlow's nginx frontend. Authentik provides SSO. The backend has outbound access for IMAP, SMTP, and OAuth; PostgreSQL and Redis use an isolated internal network. No host ports are published.
+
+`mail.blueteam.au` is the primary hostname. `mailflow.blueteam.au` permanently redirects there while preserving the path and query string. MailFlow uses one public origin for cookies, OIDC callbacks, and WebSocket origin checks; sign in again on the primary hostname after switching from the alias.
 
 ## Deploy
 
-Start the repository's core stack first so Traefik and the external `proxy` network exist. Point DNS for `mailflow.blueteam.au` at that host (or change `MAILFLOW_DOMAIN`).
+Start the repository's core stack first so Traefik and the external `proxy` network exist. Point DNS for both `mail.blueteam.au` and `mailflow.blueteam.au` at that host (or change `MAILFLOW_DOMAIN` and `MAILFLOW_ALIAS_DOMAIN`).
 
 From the repository root:
 
@@ -23,18 +25,18 @@ docker compose ps
 
 For Dockhand, deploy the entire `mailflow/` directory, including `bootstrap/configure-sso.mjs`, and enter the values from `.env.example` in its environment editor. Pasting only the Compose YAML is insufficient because the startup job requires the bootstrap bind mount.
 
-Open `https://mailflow.blueteam.au` and choose Authentik. Authorized users are provisioned on first SSO login. Connect existing mailboxes in the UI; MailFlow is an email client and requires existing IMAP/SMTP accounts. Signing into MailFlow does not grant it access to a mailbox automatically.
+Open `https://mail.blueteam.au` and choose Authentik. Authorized users are provisioned on first SSO login. Connect existing mailboxes in the UI; MailFlow is an email client and requires existing IMAP/SMTP accounts. Signing into MailFlow does not grant it access to a mailbox automatically.
 
 Optional Microsoft/Google mailbox OAuth applications can be configured in Settings → Email providers.
 
 ## Authentik SSO
 
-The live Authentik application is `mailflow`, with a confidential OAuth2 provider and these settings:
+The live Authentik application is `mailflow`, with a confidential OAuth2 provider and these settings. The previous `https://mailflow.blueteam.au/auth/oidc/authentik/callback` redirect URI is also retained during the transition:
 
 | Setting | Value |
 | --- | --- |
-| Launch URL | `https://mailflow.blueteam.au` |
-| Strict redirect URI | `https://mailflow.blueteam.au/auth/oidc/authentik/callback` |
+| Launch URL | `https://mail.blueteam.au` |
+| Strict redirect URI | `https://mail.blueteam.au/auth/oidc/authentik/callback` |
 | Issuer | `https://auth.blueteam.au/application/o/mailflow/` |
 | Scopes | `openid email profile groups` |
 | Subject | Stable user UUID |
@@ -70,7 +72,7 @@ Verify routing, PKCE, secure cookies, encrypted configuration, and login policy 
 python3 verify-sso.py
 ```
 
-This smoke check does not complete an interactive Authentik login. Also sign in as a GreenTeam administrator and as an allowed regular user, and verify that a user outside both access groups is denied.
+This smoke check also verifies that the alias permanently redirects and preserves paths and queries. It does not complete an interactive Authentik login. Also sign in as a GreenTeam administrator and as an allowed regular user, and verify that a user outside both access groups is denied.
 
 ## Data and updates
 

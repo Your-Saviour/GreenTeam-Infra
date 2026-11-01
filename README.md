@@ -20,7 +20,7 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 
 ### MailFlow Stack (`mailflow/docker-compose.yml`)
 
-MailFlow 4.1.1 provides unified webmail at `mailflow.blueteam.au`, with Authentik SSO, a backend API, dedicated PostgreSQL, and Redis. A startup job configures SSO before the frontend starts. See [mailflow/README.md](mailflow/README.md) for secrets, deployment, and group access.
+MailFlow 4.1.1 provides unified webmail at `mail.blueteam.au`, with `mailflow.blueteam.au` redirecting there. It includes Authentik SSO, a backend API, dedicated PostgreSQL, and Redis. A startup job configures SSO before the frontend starts. See [mailflow/README.md](mailflow/README.md) for secrets, deployment, and group access.
 
 ### midPoint JIT Stack (`midpoint/docker-compose.yml`)
 
