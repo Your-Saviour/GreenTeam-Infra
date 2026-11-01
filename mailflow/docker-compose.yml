@@ -1,0 +1,134 @@
+name: mailflow
+
+services:
+  frontend:
+    image: ghcr.io/maathimself/mailflow-frontend:${MAILFLOW_VERSION:-4.1.1}
+    container_name: mailflow-frontend
+    restart: unless-stopped
+    environment:
+      NGINX_TLS: "off"
+    depends_on:
+      backend:
+        condition: service_healthy
+      sso-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO/dev/null http://127.0.0.1:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.mailflow.rule=Host(`${MAILFLOW_DOMAIN:-mailflow.blueteam.au}`)
+      - traefik.http.routers.mailflow.entrypoints=websecure
+      - traefik.http.routers.mailflow.tls.certresolver=letsencrypt
+      - traefik.http.services.mailflow.loadbalancer.server.port=80
+    networks:
+      - proxy
+      - mailflow
+
+  backend:
+    image: ghcr.io/maathimself/mailflow-backend:${MAILFLOW_VERSION:-4.1.1}
+    container_name: mailflow-backend
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      APP_URL: https://${MAILFLOW_DOMAIN:-mailflow.blueteam.au}
+      FRONTEND_URL: https://${MAILFLOW_DOMAIN:-mailflow.blueteam.au}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in mailflow/.env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in mailflow/.env}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: mailflow
+      DB_USER: mailflow
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in mailflow/.env}
+      REDIS_URL: redis://redis:6379
+      # Browser -> Traefik -> MailFlow nginx -> backend.
+      TRUST_PROXY_HOPS: "2"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mailflow
+      - mailflow-internal
+
+  sso-bootstrap:
+    image: ghcr.io/maathimself/mailflow-backend:${MAILFLOW_VERSION:-4.1.1}
+    container_name: mailflow-sso-bootstrap
+    restart: "no"
+    command: ["node", "/bootstrap/configure-sso.mjs"]
+    environment:
+      DB_HOST: postgres
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in mailflow/.env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in mailflow/.env}
+      MAILFLOW_OIDC_ISSUER: https://auth.blueteam.au/application/o/mailflow/
+      MAILFLOW_OIDC_CLIENT_ID: ${MAILFLOW_OIDC_CLIENT_ID:?Set MAILFLOW_OIDC_CLIENT_ID in mailflow/.env}
+      MAILFLOW_OIDC_CLIENT_SECRET: ${MAILFLOW_OIDC_CLIENT_SECRET:?Set MAILFLOW_OIDC_CLIENT_SECRET in mailflow/.env}
+      MAILFLOW_BOOTSTRAP_ADMIN_EMAIL: ${MAILFLOW_BOOTSTRAP_ADMIN_EMAIL:?Set MAILFLOW_BOOTSTRAP_ADMIN_EMAIL in mailflow/.env}
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./bootstrap:/bootstrap:ro
+    networks:
+      - mailflow
+      - mailflow-internal
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mailflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mailflow
+      POSTGRES_USER: mailflow
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in mailflow/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mailflow -d mailflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - mailflow-internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: mailflow-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - mailflow-internal
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  proxy:
+    external: true
+  # Backend needs outbound access to mail servers and OAuth/SSO providers.
+  mailflow:
+  mailflow-internal:
+    internal: true

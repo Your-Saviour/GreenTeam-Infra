@@ -18,6 +18,10 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 | **wikijs** | `ghcr.io/requarks/wiki:2.5.317` | `wiki.blueteam.au` | Modern wiki engine with WYSIWYG and Markdown editing. Authenticates via OIDC through authentik (configured in Wiki.js admin UI). |
 | **wikijs-postgresql** | `postgres:16-alpine` | — | Dedicated PostgreSQL database for Wiki.js. Only accessible on the isolated internal network. |
 
+### MailFlow Stack (`mailflow/docker-compose.yml`)
+
+MailFlow 4.1.1 provides unified webmail at `mailflow.blueteam.au`, with Authentik SSO, a backend API, dedicated PostgreSQL, and Redis. A startup job configures SSO before the frontend starts. See [mailflow/README.md](mailflow/README.md) for secrets, deployment, and group access.
+
 ### midPoint JIT Stack (`midpoint/docker-compose.yml`)
 
 | Container | Image | Domain | Description |
@@ -208,6 +212,7 @@ my-service:
 docker-compose.yml              # Core: Traefik + Dockhand
 docker-compose.dockhand.yml     # Services: authentik, Homarr, Vaultwarden
 wikijs/docker-compose.yml       # Wiki.js + dedicated PostgreSQL
+mailflow/docker-compose.yml     # MailFlow webmail + PostgreSQL + Redis
 midpoint/docker-compose.yml     # midPoint JIT governance + PostgreSQL
 midpoint/objects/               # Fixed-OID Authentik/JIT bootstrap objects
 midpoint/README.md              # Setup, acceptance, operations, and onboarding

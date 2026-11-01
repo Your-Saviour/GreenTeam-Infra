@@ -1,4 +1,5 @@
 .env
 midpoint/.env
+mailflow/.env
 acme.json
 testing/wazuh/config/wazuh_indexer_ssl_certs/
