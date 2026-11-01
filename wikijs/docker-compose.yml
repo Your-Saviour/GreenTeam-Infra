@@ -50,7 +50,7 @@ services:
   # Wiki.js - Modern wiki engine with WYSIWYG and Markdown editing
   # ---------------------------------------------------------------------------
   wikijs:
-    image: ghcr.io/requarks/wiki:2
+    image: ghcr.io/requarks/wiki:2.5.317
     container_name: wikijs
     restart: unless-stopped
     environment:

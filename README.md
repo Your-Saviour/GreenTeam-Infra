@@ -9,13 +9,13 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 | Container | Image | Domain | Description |
 |-----------|-------|--------|-------------|
 | **traefik** | `traefik:latest` | `traefik.gt.blueteam.au` | Reverse proxy and TLS termination. Routes all incoming traffic to backend services via Docker label discovery. Dashboard is protected with basic auth. |
-| **dockhand** | `fnsys/dockhand:latest` | `dockhand.gt.blueteam.au` | Web UI for managing Docker Compose stacks. Provides a GUI to deploy, restart, and monitor containers on the host. |
+| **dockhand** | `fnsys/dockhand:v1.0.56` | `dockhand.gt.blueteam.au` | Web UI for managing Docker Compose stacks. Provides a GUI to deploy, restart, and monitor containers on the host. |
 
 ### Wiki.js Stack (`wikijs/docker-compose.yml`)
 
 | Container | Image | Domain | Description |
 |-----------|-------|--------|-------------|
-| **wikijs** | `ghcr.io/requarks/wiki:2` | `wiki.blueteam.au` | Modern wiki engine with WYSIWYG and Markdown editing. Authenticates via OIDC through authentik (configured in Wiki.js admin UI). |
+| **wikijs** | `ghcr.io/requarks/wiki:2.5.317` | `wiki.blueteam.au` | Modern wiki engine with WYSIWYG and Markdown editing. Authenticates via OIDC through authentik (configured in Wiki.js admin UI). |
 | **wikijs-postgresql** | `postgres:16-alpine` | — | Dedicated PostgreSQL database for Wiki.js. Only accessible on the isolated internal network. |
 
 ### midPoint JIT Stack (`midpoint/docker-compose.yml`)
@@ -32,11 +32,11 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 
 | Container | Image | Domain | Description |
 |-----------|-------|--------|-------------|
-| **authentik-server** | `ghcr.io/goauthentik/server:2026.2.1` | `auth.blueteam.au` | Identity provider handling SSO, OIDC, SAML, and LDAP. Serves the admin UI and all authentication flows. |
-| **authentik-worker** | `ghcr.io/goauthentik/server:2026.2.1` | — | Background worker for authentik. Handles emails, LDAP sync, and outpost management. Not exposed to the web. |
+| **authentik-server** | `ghcr.io/goauthentik/server:2026.2.7` | `auth.blueteam.au` | Identity provider handling SSO, OIDC, SAML, and LDAP. Serves the admin UI and all authentication flows. |
+| **authentik-worker** | `ghcr.io/goauthentik/server:2026.2.7` | — | Background worker for authentik. Handles emails, LDAP sync, and outpost management. Not exposed to the web. |
 | **authentik-postgresql** | `postgres:16-alpine` | — | PostgreSQL database for all authentik data, caching, and task queuing. Only accessible on the isolated internal network. |
-| **homarr** | `ghcr.io/homarr-labs/homarr:latest` | `home.blueteam.au` | Homepage dashboard with per-user boards. Authenticates via OIDC through authentik. Groups synced from authentik control which board each user sees. |
-| **vaultwarden** | `vaultwarden/server:latest` | `vault.gt.blueteam.au` | Lightweight Bitwarden-compatible password manager. Authenticates via OIDC through authentik. Signups and invitations are disabled — accounts must exist before SSO login. |
+| **homarr** | `ghcr.io/homarr-labs/homarr:v1.77.2` | `home.blueteam.au` | Homepage dashboard with per-user boards. Authenticates via OIDC through authentik. Groups synced from authentik control which board each user sees. |
+| **vaultwarden** | `vaultwarden/server:1.37.4` | `vault.gt.blueteam.au` | Lightweight Bitwarden-compatible password manager. Authenticates via OIDC through authentik. Signups and invitations are disabled — accounts must exist before SSO login. |
 
 ## Quick Start
 

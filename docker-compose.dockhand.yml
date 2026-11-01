@@ -5,9 +5,9 @@
 # All services use the shared 'proxy' network for Traefik discovery.
 #
 # Current services:
-#   authentik    v2026.2.6  - https://docs.goauthentik.io   (auth.blueteam.au)
-#   Homarr       (latest)   - https://homarr.dev             (home.blueteam.au)
-#   Vaultwarden  (latest)   - https://github.com/dani-garcia/vaultwarden  (vault.gt.blueteam.au)
+#   authentik    v2026.2.7  - https://docs.goauthentik.io   (auth.blueteam.au)
+#   Homarr       v1.77.2    - https://homarr.dev             (home.blueteam.au)
+#   Vaultwarden  v1.37.4    - https://github.com/dani-garcia/vaultwarden  (vault.gt.blueteam.au)
 #
 # FIRST TIME SETUP:
 #   1. Copy .env.example.dockhand to .env and fill in your values
@@ -57,7 +57,7 @@ services:
   # authentik Server - Handles SSO flows, OIDC/SAML/LDAP providers, and the UI
   # ---------------------------------------------------------------------------
   server:
-    image: ghcr.io/goauthentik/server:2026.2.6
+    image: ghcr.io/goauthentik/server:2026.2.7
     container_name: authentik-server
     restart: unless-stopped
     command: server
@@ -69,15 +69,15 @@ services:
       AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?Please set AUTHENTIK_SECRET_KEY in your .env file}
       AUTHENTIK_FOOTER_LINKS: '[{"name":"Don’t have an account? Check the Discord pinned messages.","href":null}]'
-      # -- Optional: Email configuration --
-      # AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
-      # AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
-      # AUTHENTIK_EMAIL__USERNAME: ${EMAIL_USERNAME:-""}
-      # AUTHENTIK_EMAIL__PASSWORD: ${EMAIL_PASSWORD:-""}
-      # AUTHENTIK_EMAIL__USE_TLS: ${EMAIL_USE_TLS:-false}
-      # AUTHENTIK_EMAIL__USE_SSL: ${EMAIL_USE_SSL:-false}
-      # AUTHENTIK_EMAIL__TIMEOUT: ${EMAIL_TIMEOUT:-10}
-      # AUTHENTIK_EMAIL__FROM: ${EMAIL_FROM:-authentik@localhost}
+      # Global SMTP settings (credentials supplied through Dockhand environment variables).
+      AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
+      AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
+      AUTHENTIK_EMAIL__USERNAME: ${EMAIL_USERNAME:-}
+      AUTHENTIK_EMAIL__PASSWORD: ${EMAIL_PASSWORD:-}
+      AUTHENTIK_EMAIL__USE_TLS: ${EMAIL_USE_TLS:-false}
+      AUTHENTIK_EMAIL__USE_SSL: ${EMAIL_USE_SSL:-false}
+      AUTHENTIK_EMAIL__TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      AUTHENTIK_EMAIL__FROM: ${EMAIL_FROM:-authentik@localhost}
     volumes:
       - ./data:/data
       - ./data/custom-templates:/templates
@@ -98,7 +98,7 @@ services:
   # authentik Worker - Background tasks (emails, LDAP sync, outpost management)
   # ---------------------------------------------------------------------------
   worker:
-    image: ghcr.io/goauthentik/server:2026.2.6
+    image: ghcr.io/goauthentik/server:2026.2.7
     container_name: authentik-worker
     restart: unless-stopped
     command: worker
@@ -110,14 +110,15 @@ services:
       AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
       AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
       AUTHENTIK_FOOTER_LINKS: '[{"name":"Don’t have an account? Check the Discord pinned messages.","href":null}]'
-      # -- Match any email settings configured on the server above --
-      # AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
-      # AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
-      # AUTHENTIK_EMAIL__USERNAME: ${EMAIL_USERNAME:-""}
-      # AUTHENTIK_EMAIL__PASSWORD: ${EMAIL_PASSWORD:-""}
-      # AUTHENTIK_EMAIL__USE_TLS: ${EMAIL_USE_TLS:-false}
-      # AUTHENTIK_EMAIL__USE_SSL: ${EMAIL_USE_SSL:-false}
-      # AUTHENTIK_EMAIL__FROM: ${EMAIL_FROM:-authentik@localhost}
+      # Match the server's global SMTP settings.
+      AUTHENTIK_EMAIL__HOST: ${EMAIL_HOST:-localhost}
+      AUTHENTIK_EMAIL__PORT: ${EMAIL_PORT:-25}
+      AUTHENTIK_EMAIL__USERNAME: ${EMAIL_USERNAME:-}
+      AUTHENTIK_EMAIL__PASSWORD: ${EMAIL_PASSWORD:-}
+      AUTHENTIK_EMAIL__USE_TLS: ${EMAIL_USE_TLS:-false}
+      AUTHENTIK_EMAIL__USE_SSL: ${EMAIL_USE_SSL:-false}
+      AUTHENTIK_EMAIL__TIMEOUT: ${EMAIL_TIMEOUT:-10}
+      AUTHENTIK_EMAIL__FROM: ${EMAIL_FROM:-authentik@localhost}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/data
@@ -127,6 +128,7 @@ services:
         condition: service_healthy
     networks:
       - authentik-internal
+      - authentik-egress
 
   # ---------------------------------------------------------------------------
   # Homarr - Homepage dashboard with per-user boards and native OIDC SSO
@@ -146,7 +148,7 @@ services:
   #   different apps when they log in.
   # ---------------------------------------------------------------------------
   homarr:
-    image: ghcr.io/homarr-labs/homarr:latest
+    image: ghcr.io/homarr-labs/homarr:v1.77.2
     container_name: homarr
     restart: unless-stopped
     dns:
@@ -194,7 +196,7 @@ services:
   #   5. Restart Vaultwarden: docker compose -f docker-compose.dockhand.yml restart vaultwarden
   # ---------------------------------------------------------------------------
   vaultwarden:
-    image: vaultwarden/server:latest
+    image: vaultwarden/server:1.37.4
     container_name: vaultwarden
     restart: unless-stopped
     volumes:
@@ -233,6 +235,7 @@ volumes:
 # Networks
 # authentik-internal: Isolated network between authentik services and postgres.
 #                     No external access - only inter-container traffic.
+# authentik-egress:   Outbound access for worker SMTP and other background tasks.
 # proxy:             Shared Traefik network. Services on this network are
 #                    discoverable by Traefik for automatic routing.
 #                    Defined in the main docker-compose.yml.
@@ -240,5 +243,7 @@ volumes:
 networks:
   authentik-internal:
     internal: true
+  authentik-egress:
+    driver: bridge
   proxy:
     external: true

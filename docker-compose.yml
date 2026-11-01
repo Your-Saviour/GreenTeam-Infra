@@ -18,6 +18,15 @@ services:
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
       - "traefik.http.middlewares.dashboard-auth.basicauth.users=admin:$$2y$$05$$gxakRHt5HcGQM3I3mJJvEuq9r4as6J4TQEp1gldCpzoNkF689b4iu"
+      # Redirect the apex domain to Homarr, preserving the path and query string.
+      - "traefik.http.routers.blueteam-root.rule=Host(`blueteam.au`)"
+      - "traefik.http.routers.blueteam-root.entrypoints=websecure"
+      - "traefik.http.routers.blueteam-root.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.blueteam-root.service=noop@internal"
+      - "traefik.http.routers.blueteam-root.middlewares=blueteam-root-redirect"
+      - "traefik.http.middlewares.blueteam-root-redirect.redirectregex.regex=^https?://blueteam[.]au(:[0-9]+)?/(.*)"
+      - "traefik.http.middlewares.blueteam-root-redirect.redirectregex.replacement=https://home.blueteam.au/$${2}"
+      - "traefik.http.middlewares.blueteam-root-redirect.redirectregex.permanent=true"
     networks:
       proxy:
         aliases:
@@ -25,7 +34,7 @@ services:
           - home.blueteam.au
 
   dockhand:
-    image: fnsys/dockhand:latest
+    image: fnsys/dockhand:v1.0.56
     container_name: dockhand
     restart: unless-stopped
     volumes:
