@@ -36,6 +36,7 @@ services:
       OIDC_NAME_PATH: preferred_username
       OIDC_GROUP_CLAIM: groups
       OIDC_ADMIN_GROUP: ${TERMIX_OIDC_ADMIN_GROUP:-GROUP-GreenTeam}
+      OIDC_ROLE_MAP: GROUP-GreenTeam:greenteam
       OIDC_ALLOWED_USERS: ${TERMIX_OIDC_ALLOWED_USERS:-}
       OIDC_ENV_OVERRIDE: "true"
       OIDC_LEGACY_CALLBACK: "false"

@@ -52,6 +52,13 @@ receive normal accounts. Ensure `preferred_username` is stable and unique.
 Copy the provider's client ID and secret into the stack environment. No
 Authentik API token is needed by Termix.
 
+For host sharing, create a custom role with name `greenteam` and display name
+`GreenTeam` in Settings, Roles. The deployment sets
+`OIDC_ROLE_MAP=GROUP-GreenTeam:greenteam`, assigning that role to GreenTeam
+members on their next SSO login. System roles such as Admin are hidden from
+the sharing picker. Share hosts or folders with the custom GreenTeam role;
+the mapping itself does not share hosts automatically.
+
 ## Deploy
 
 Point DNS for `termix.blueteam.au` at the production Traefik host. Start the root
