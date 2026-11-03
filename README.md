@@ -22,6 +22,13 @@ Docker infrastructure for the GreenTeam project. All services sit behind a Traef
 
 MailFlow 4.1.1 provides unified webmail at `mail.blueteam.au`, with `mailflow.blueteam.au` redirecting there. It includes Authentik SSO, a backend API, dedicated PostgreSQL, and Redis. A startup job configures SSO before the frontend starts. See [mailflow/README.md](mailflow/README.md) for secrets, deployment, and group access.
 
+### Termix Stack (`termix/docker-compose.yml`)
+
+Termix 26.11.0 provides SSH and server management at `termix.blueteam.au`, with
+the bundled SSO plugin configured for Authentik. It uses the production `proxy`
+network and persistent encrypted SQLite storage. See [termix/README.md](termix/README.md)
+for the Authentik provider, required secrets, deployment, and recovery steps.
+
 ### midPoint JIT Stack (`midpoint/docker-compose.yml`)
 
 | Container | Image | Domain | Description |
@@ -213,6 +220,7 @@ docker-compose.yml              # Core: Traefik + Dockhand
 docker-compose.dockhand.yml     # Services: authentik, Homarr, Vaultwarden
 wikijs/docker-compose.yml       # Wiki.js + dedicated PostgreSQL
 mailflow/docker-compose.yml     # MailFlow webmail + PostgreSQL + Redis
+termix/docker-compose.yml       # Production Termix + Authentik SSO
 midpoint/docker-compose.yml     # midPoint JIT governance + PostgreSQL
 midpoint/objects/               # Fixed-OID Authentik/JIT bootstrap objects
 midpoint/README.md              # Setup, acceptance, operations, and onboarding

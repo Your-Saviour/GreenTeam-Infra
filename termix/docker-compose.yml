@@ -1,0 +1,73 @@
+name: termix-production
+
+services:
+  termix:
+    # Standard profile includes SSO 1.0.5; OIDC_CLIENT_ID enables it on first boot.
+    image: ghcr.io/termix-ssh/termix:${TERMIX_VERSION:-26.11.0}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PORT: "8080"
+      DATA_DIR: /app/data
+      ENABLE_SSL: "false"
+      EXTERNAL_FORCE_HTTPS: "true"
+      TERMIX_REQUIRE_EXTERNAL_SECRETS: "true"
+      JWT_SECRET: ${TERMIX_JWT_SECRET:?Set TERMIX_JWT_SECRET}
+      DATABASE_KEY: ${TERMIX_DATABASE_KEY:?Set TERMIX_DATABASE_KEY}
+      ENCRYPTION_KEY: ${TERMIX_ENCRYPTION_KEY:?Set TERMIX_ENCRYPTION_KEY}
+      INTERNAL_AUTH_TOKEN: ${TERMIX_INTERNAL_AUTH_TOKEN:?Set TERMIX_INTERNAL_AUTH_TOKEN}
+      ALLOW_REGISTRATION: "false"
+      ALLOW_PASSWORD_RESET: "false"
+      ALLOW_PASSWORD_LOGIN: "true"
+      EXTERNAL_ALLOW_REGISTRATION: "true"
+      TERMIX_REQUIRE_SIGNED_PLUGINS: "true"
+      ENABLE_TELEMETRY: "false"
+      OIDC_CLIENT_ID: ${TERMIX_OIDC_CLIENT_ID:?Set TERMIX_OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${TERMIX_OIDC_CLIENT_SECRET:?Set TERMIX_OIDC_CLIENT_SECRET}
+      OIDC_ISSUER_URL: https://auth.blueteam.au/application/o/${TERMIX_OIDC_SLUG:-termix}/
+      OIDC_AUTHORIZATION_URL: https://auth.blueteam.au/application/o/authorize/
+      OIDC_TOKEN_URL: https://auth.blueteam.au/application/o/token/
+      OIDC_USERINFO_URL: https://auth.blueteam.au/application/o/userinfo/
+      OIDC_SCOPES: openid email profile groups
+      OIDC_IDENTIFIER_PATH: sub
+      OIDC_NAME_PATH: preferred_username
+      OIDC_GROUP_CLAIM: groups
+      OIDC_ADMIN_GROUP: ${TERMIX_OIDC_ADMIN_GROUP:-GROUP-GreenTeam}
+      OIDC_ALLOWED_USERS: ${TERMIX_OIDC_ALLOWED_USERS:-}
+      OIDC_ENV_OVERRIDE: "true"
+      OIDC_LEGACY_CALLBACK: "false"
+      # Keep the login page available for recovery if Authentik is unavailable.
+      OIDC_SILENT_LOGIN_DEFAULT: "false"
+    volumes:
+      - termix_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:30001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.termix-production.rule=Host(`${TERMIX_DOMAIN:-termix.blueteam.au}`)
+      - traefik.http.routers.termix-production.entrypoints=websecure
+      - traefik.http.routers.termix-production.tls.certresolver=letsencrypt
+      - traefik.http.routers.termix-production.service=termix-production
+      - traefik.http.services.termix-production.loadbalancer.server.port=8080
+    networks:
+      - proxy
+
+volumes:
+  termix_data:
+
+networks:
+  proxy:
+    external: true
